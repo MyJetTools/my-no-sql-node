@@ -17,7 +17,7 @@ impl InitTableEventSyncData {
         event_src: EventSource,
     ) -> Self {
         Self {
-            table_data: SyncTableData::new(table_data, table_attrs.persist),
+            table_data: SyncTableData::new(table_data),
             event_src,
             table_snapshot: DbTableSnapshot::new(
                 table_data.get_last_update_time(),

@@ -1,6 +1,7 @@
 use app::{logs::Logs, AppContext};
 use background::{
-    gc_http_sessions::GcHttpSessionsTimer, metrics_updater::MetricsUpdater, sync::SyncEventLoop,
+    gc_http_sessions::GcHttpSessionsTimer, gc_multipart::GcMultipart,
+    metrics_updater::MetricsUpdater, sync::SyncEventLoop,
 };
 
 use my_no_sql_tcp_shared::MyNoSqlReaderTcpSerializer;
@@ -8,10 +9,10 @@ use my_tcp_sockets::TcpServer;
 use rust_extensions::MyTimer;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tcp::TcpServerEvents;
+use tcp_client::TcpClientSocketCallback;
 
 mod app;
-
-mod persist;
+mod tcp_client;
 
 mod db_operations;
 mod db_sync;
@@ -23,7 +24,6 @@ mod background;
 mod data_readers;
 mod operations;
 mod settings_reader;
-mod utils;
 
 #[tokio::main]
 async fn main() {
@@ -43,8 +43,6 @@ async fn main() {
 
     let mut timer_1s = MyTimer::new(Duration::from_secs(1));
 
-    let mut persist_timer = MyTimer::new(Duration::from_secs(1));
-
     timer_1s.register_timer("MetricsUpdated", Arc::new(MetricsUpdater::new(app.clone())));
 
     let mut timer_10s = MyTimer::new(Duration::from_secs(10));
@@ -53,9 +51,13 @@ async fn main() {
         Arc::new(GcHttpSessionsTimer::new(app.clone())),
     );
 
+    let mut timer_30s = MyTimer::new(Duration::from_secs(30));
+
+    timer_30s.register_timer("GcMultipart", Arc::new(GcMultipart::new(app.clone())));
+
     timer_1s.start(app.states.clone(), app.clone());
     timer_10s.start(app.states.clone(), app.clone());
-    persist_timer.start(app.states.clone(), app.clone());
+    timer_30s.start(app.states.clone(), app.clone());
 
     app.sync.start(app.states.clone(), app.clone()).await;
 
@@ -75,24 +77,19 @@ async fn main() {
         )
         .await;
 
-    signal_hook::flag::register(
-        signal_hook::consts::SIGTERM,
-        app.states.shutting_down.clone(),
-    )
-    .unwrap();
+    let socket_callback = TcpClientSocketCallback::new(app.clone());
 
-    shut_down_task(app).await;
-}
+    let socket_callback = Arc::new(socket_callback);
 
-async fn shut_down_task(app: Arc<AppContext>) {
-    let duration = Duration::from_secs(1);
+    app.tcp_client
+        .start(
+            Arc::new(|| -> MyNoSqlReaderTcpSerializer { MyNoSqlReaderTcpSerializer::new() }),
+            socket_callback,
+            app.clone(),
+        )
+        .await;
 
-    while !app.states.is_shutting_down() {
-        tokio::time::sleep(duration).await;
-    }
-
-    println!("Shut down detected. Waiting for 1 second to deliver all messages");
-    tokio::time::sleep(duration).await;
+    app.states.wait_until_shutdown().await;
 
     crate::operations::shutdown::execute(app.as_ref()).await;
 }

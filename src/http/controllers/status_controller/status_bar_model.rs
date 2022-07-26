@@ -12,8 +12,6 @@ pub struct LocationModel {
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
 pub struct StatusBarModel {
     pub location: LocationModel,
-    #[serde(rename = "persistAmount")]
-    persist_amount: usize,
     #[serde(rename = "tcpConnections")]
     pub tcp_connections: usize,
     #[serde(rename = "tablesAmount")]
@@ -37,7 +35,6 @@ impl StatusBarModel {
                 id: app.settings.location.to_string(),
                 compress: false,
             },
-            persist_amount: app.get_persist_amount(),
             tcp_connections,
             http_connections,
             tables_amount,

@@ -17,7 +17,7 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
 
             tcp_contract.serialize().into()
         }
-        SyncEvent::UpdateTableAttributes(_) => None,
+
         SyncEvent::InitTable(sync_data) => {
             let data = sync_data.table_snapshot.as_json_array().build();
 
@@ -94,14 +94,6 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
             }
 
             result.into()
-        }
-        SyncEvent::DeleteTable(data) => {
-            let contract = TcpContract::InitTable {
-                table_name: data.table_data.table_name.to_string(),
-                data: EMPTY_ARRAY.to_vec(),
-            };
-
-            contract.serialize().into()
         }
     }
 }

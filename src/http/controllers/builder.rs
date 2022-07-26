@@ -42,14 +42,6 @@ pub fn build(app: &Arc<AppContext>) -> ControllersMiddleware {
         app.clone(),
     )));
 
-    result.register_post_action(Arc::new(
-        super::gc_controller::CleanAndKeepMaxPartitionsAmountAction::new(app.clone()),
-    ));
-
-    result.register_post_action(Arc::new(
-        super::gc_controller::CleanPartitionAndKepMaxRecordsControllerAction::new(app.clone()),
-    ));
-
     result.register_get_action(Arc::new(super::row_controller::RowCountAction::new(
         app.clone(),
     )));

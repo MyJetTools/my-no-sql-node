@@ -1,16 +1,14 @@
-use std::{
-    sync::{atomic::AtomicUsize, Arc},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use my_no_sql_core::db::DbInstance;
+use my_tcp_sockets::TcpClient;
 use rust_extensions::{
     date_time::DateTimeAsMicroseconds, events_loop::EventsLoop, AppStates, Logger,
 };
 
 use crate::{
     data_readers::DataReadersList, db_operations::multipart::MultipartList, db_sync::SyncEvent,
-    persist::PersistMarkersByTable, settings_reader::SettingsModel,
+    settings_reader::SettingsModel,
 };
 
 use super::{
@@ -19,9 +17,6 @@ use super::{
 };
 
 pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
-pub const DEFAULT_PERSIST_PERIOD: crate::db_sync::DataSynchronizationPeriod =
-    crate::db_sync::DataSynchronizationPeriod::Sec5;
 
 pub struct AppContext {
     pub created: DateTimeAsMicroseconds,
@@ -38,14 +33,16 @@ pub struct AppContext {
     pub settings: Arc<SettingsModel>,
     pub sync: EventsLoop<SyncEvent>,
     pub states: Arc<AppStates>,
-    pub persist_markers: PersistMarkersByTable,
-    persist_amount: AtomicUsize,
+    pub tcp_client: TcpClient,
 }
 
 impl AppContext {
     pub fn new(logs: Arc<Logs>, settings: Arc<SettingsModel>) -> Self {
+        let tcp_client = TcpClient::new(
+            "NodeConnection".to_string(),
+            settings.main_server.to_string(),
+        );
         AppContext {
-            persist_markers: PersistMarkersByTable::new(),
             created: DateTimeAsMicroseconds::now(),
             db: DbInstance::new(),
             logs,
@@ -57,19 +54,9 @@ impl AppContext {
             multipart_list: MultipartList::new(),
 
             settings,
-            persist_amount: AtomicUsize::new(0),
             sync: EventsLoop::new("SyncEventsLoop".to_string()),
+            tcp_client,
         }
-    }
-
-    pub fn update_persist_amount(&self, value: usize) {
-        self.persist_amount
-            .store(value, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    pub fn get_persist_amount(&self) -> usize {
-        self.persist_amount
-            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

@@ -3,7 +3,7 @@ use my_http_server_swagger::*;
 use rust_extensions::{date_time::DateTimeAsMicroseconds, ApplicationStates};
 use serde::{Deserialize, Serialize};
 
-use super::{non_initialized::NonInitializedModel, status_bar_model::StatusBarModel};
+use super::status_bar_model::StatusBarModel;
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
 pub struct TableModel {
@@ -18,14 +18,6 @@ pub struct TableModel {
     pub expiration_index_records_amount: usize,
     #[serde(rename = "lastUpdateTime")]
     pub last_update_time: i64,
-    #[serde(rename = "lastPersistTime")]
-    pub last_persist_time: Option<i64>,
-    #[serde(rename = "lastPersistDuration")]
-    pub last_persist_duration: Vec<usize>,
-    #[serde(rename = "nextPersistTime")]
-    pub next_persist_time: Option<i64>,
-    #[serde(rename = "persistAmount")]
-    pub persist_amount: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
@@ -47,8 +39,8 @@ pub struct ReaderModel {
 }
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
 pub struct StatusModel {
-    #[serde(rename = "notInitialized", skip_serializing_if = "Option::is_none")]
-    not_initialized: Option<NonInitializedModel>,
+    #[serde(rename = "notInitialized")]
+    not_initialized: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     initialized: Option<InitializedModel>,
     #[serde(rename = "statusBar")]
@@ -63,13 +55,7 @@ impl StatusModel {
         let mut tables_model = Vec::new();
 
         for table in &tables {
-            let metrics = crate::operations::get_table_metrics(app, table.as_ref()).await;
-
-            let last_persist_time = if let Some(last_persist_time) = metrics.last_persist_time {
-                Some(last_persist_time.unix_microseconds)
-            } else {
-                None
-            };
+            let metrics = crate::operations::get_table_metrics(table.as_ref()).await;
 
             let table_model = TableModel {
                 name: table.name.clone(),
@@ -78,14 +64,6 @@ impl StatusModel {
                 expiration_index_records_amount: metrics.expiration_index_records_amount,
                 records_amount: metrics.records_amount,
                 last_update_time: metrics.last_update_time.unix_microseconds,
-                last_persist_time,
-                persist_amount: metrics.persist_amount,
-                last_persist_duration: metrics.last_persist_duration,
-                next_persist_time: if let Some(next_persist_time) = metrics.next_persist_time {
-                    Some(next_persist_time.unix_microseconds)
-                } else {
-                    None
-                },
             };
 
             tables_model.push(table_model);
@@ -93,14 +71,14 @@ impl StatusModel {
 
         if app.states.is_initialized() {
             return Self {
-                not_initialized: None,
+                not_initialized: true,
                 initialized: Some(InitializedModel::new(readers, tables_model)),
                 status_bar: StatusBarModel::new(app, tcp, http, tables.len()),
             };
         }
 
         return Self {
-            not_initialized: Some(NonInitializedModel::new(app).await),
+            not_initialized: false,
             initialized: None,
             status_bar: StatusBarModel::new(app, tcp, http, tables.len()),
         };

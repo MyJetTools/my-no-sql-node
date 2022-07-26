@@ -18,12 +18,6 @@ pub async fn convert(sync_event: &SyncEvent) -> Option<Vec<u8>> {
         SyncEvent::InitPartitions(sync_data) => write_init_partitions_result(sync_data).into(),
         SyncEvent::UpdateRows(sync_data) => compile_update_rows_result(sync_data).into(),
         SyncEvent::DeleteRows(sync_data) => compile_delete_rows_result(sync_data).into(),
-        SyncEvent::DeleteTable(sync_data) => write_init_table_result(
-            sync_data.table_data.table_name.as_str(),
-            JsonArrayWriter::new(),
-        )
-        .into(),
-        SyncEvent::UpdateTableAttributes(_) => None,
     }
 }
 

@@ -11,9 +11,9 @@ pub struct UpdateRowsSyncData {
 }
 
 impl UpdateRowsSyncData {
-    pub fn new(table_data: &DbTableInner, persist: bool, event_src: EventSource) -> Self {
+    pub fn new(table_data: &DbTableInner, event_src: EventSource) -> Self {
         Self {
-            table_data: SyncTableData::new(table_data, persist),
+            table_data: SyncTableData::new(table_data),
             event_src,
             rows_by_partition: DbRowsByPartitionsSnapshot::new(),
         }

@@ -54,8 +54,4 @@ interface ITableModel {
     recordsAmount: number;
     expirationIndex: number;
     lastUpdateTime: number;
-    lastPersistTime: number;
-    nextPersistTime: number;
-    lastPersistDuration: number[];
-    persistAmount: number;
 }

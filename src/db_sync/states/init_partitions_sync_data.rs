@@ -14,19 +14,10 @@ pub struct InitPartitionsSyncData {
 }
 
 impl InitPartitionsSyncData {
-    pub fn new(table_data: &DbTableInner, event_src: EventSource, persist: bool) -> Self {
-        Self {
-            table_data: SyncTableData::new(table_data, persist),
-            event_src,
-            partitions_to_update: BTreeMap::new(),
-        }
-    }
-
     pub fn new_as_update_partition(
         table_data: &DbTableInner,
         partition_key: &str,
         event_src: EventSource,
-        persist: bool,
     ) -> Self {
         let mut partitions_to_update = BTreeMap::new();
 
@@ -38,14 +29,10 @@ impl InitPartitionsSyncData {
         }
 
         Self {
-            table_data: SyncTableData::new(table_data, persist),
+            table_data: SyncTableData::new(table_data),
             event_src,
             partitions_to_update,
         }
-    }
-
-    pub fn add(&mut self, partition_key: String, snapshot: Option<DbPartitionSnapshot>) {
-        self.partitions_to_update.insert(partition_key, snapshot);
     }
 
     pub fn as_json(&self) -> JsonObjectWriter {

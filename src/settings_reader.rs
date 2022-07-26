@@ -8,6 +8,9 @@ pub struct SettingsModel {
     pub location: String,
     #[serde(rename = "Tables")]
     pub tables: Vec<String>,
+
+    #[serde(rename = "MainServer")]
+    pub main_server: String,
 }
 
 pub async fn read_settings() -> SettingsModel {

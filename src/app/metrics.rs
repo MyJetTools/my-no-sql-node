@@ -12,11 +12,9 @@ pub struct PrometheusMetrics {
     registry: Registry,
     partitions_amount: IntGaugeVec,
     table_size: IntGaugeVec,
-    persist_amount: IntGaugeVec,
     tcp_connections_count: IntGauge,
     tcp_connections_changes: IntGaugeVec,
     fatal_errors_count: IntGauge,
-    persist_delay_in_seconds: IntGaugeVec,
     pending_to_sync: IntGaugeVec,
 }
 
@@ -67,11 +65,9 @@ impl PrometheusMetrics {
             registry,
             partitions_amount,
             table_size,
-            persist_amount,
             tcp_connections_count,
             tcp_connections_changes,
             fatal_errors_count,
-            persist_delay_in_seconds,
             pending_to_sync,
         };
     }
@@ -86,17 +82,6 @@ impl PrometheusMetrics {
         self.table_size
             .with_label_values(&[table_name])
             .set(table_size_value);
-
-        let persist_amount_value = table_metrics.persist_amount as i64;
-        self.persist_amount
-            .with_label_values(&[table_name])
-            .set(persist_amount_value);
-    }
-
-    pub fn update_persist_delay(&self, table_name: &str, persist_delay: i64) {
-        self.persist_delay_in_seconds
-            .with_label_values(&[table_name])
-            .set(persist_delay);
     }
 
     pub async fn update_pending_to_sync<TUpdatePendingToSyncModel: UpdatePendingToSyncModel>(

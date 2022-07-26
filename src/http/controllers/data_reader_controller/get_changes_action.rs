@@ -5,13 +5,11 @@ use my_http_server_controllers::controllers::{
     actions::PostAction,
     documentation::{data_types::HttpDataType, out_results::HttpResult, HttpActionDescription},
 };
-use my_no_sql_core::db::UpdateExpirationTimeModel;
 
 use crate::{
     app::AppContext,
     data_readers::{http_connection::HttpPayload, DataReaderConnection},
     db_operations::DbOperationError,
-    db_sync::EventSource,
     http::http_sessions::HttpSessionsSupport,
 };
 
@@ -104,16 +102,16 @@ async fn update_expiration_time(
 
     let db_table = db_table.unwrap();
     for item in items {
-        let src = EventSource::as_client_request(app);
+        //    let src = EventSource::as_client_request(app);
 
-        let update_expiration = UpdateExpirationTimeModel::new(
-            item.set_db_rows_expiration_time.as_ref(),
-            item.set_db_partition_expiration_time.as_ref(),
-        );
+        //let update_expiration = UpdateExpirationTimeModel::new(
+        //    item.set_db_rows_expiration_time.as_ref(),
+        //    item.set_db_partition_expiration_time.as_ref(),
+        //);
 
-        if let Some(update_expiration) = &update_expiration {
-            //TODO - UpdateExpirationTime to MasterNode
-        }
+        //if let Some(update_expiration) = &update_expiration {
+        //TODO - UpdateExpirationTime to MasterNode
+        //}
     }
 
     Ok(())

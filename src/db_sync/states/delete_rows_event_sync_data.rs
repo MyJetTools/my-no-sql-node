@@ -15,9 +15,9 @@ pub struct DeleteRowsEventSyncData {
 }
 
 impl DeleteRowsEventSyncData {
-    pub fn new(table_data: &DbTableInner, persist: bool, event_src: EventSource) -> Self {
+    pub fn new(table_data: &DbTableInner, event_src: EventSource) -> Self {
         Self {
-            table_data: SyncTableData::new(table_data, persist),
+            table_data: SyncTableData::new(table_data),
             event_src,
             deleted_partitions: None,
             deleted_rows: None,
@@ -52,35 +52,6 @@ impl DeleteRowsEventSyncData {
             .get_mut(partition_key)
             .unwrap()
             .insert(deleted_row.row_key.to_string(), deleted_row.clone());
-    }
-
-    pub fn add_deleted_rows(&mut self, partition_key: &str, deleted_rows: &[Arc<DbRow>]) {
-        let deleted_rows_btree_map = self.check_that_we_are_in_partition_mode(partition_key);
-
-        if !deleted_rows_btree_map.contains_key(partition_key) {
-            deleted_rows_btree_map.insert(partition_key.to_string(), BTreeMap::new());
-        }
-
-        let by_partition = deleted_rows_btree_map.get_mut(partition_key).unwrap();
-
-        for deleted_row in deleted_rows {
-            by_partition.insert(deleted_row.row_key.to_string(), deleted_row.clone());
-        }
-    }
-
-    pub fn new_deleted_partition(&mut self, partition_key: String) {
-        if let Some(deleted_rows) = &mut self.deleted_rows {
-            deleted_rows.remove(partition_key.as_str());
-        }
-
-        if self.deleted_partitions.is_none() {
-            self.deleted_partitions = Some(BTreeMap::new());
-        }
-
-        self.deleted_partitions
-            .as_mut()
-            .unwrap()
-            .insert(partition_key, ());
     }
 
     pub fn as_vec(&self) -> Vec<u8> {
