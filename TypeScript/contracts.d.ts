@@ -38,13 +38,14 @@ interface IInitializedStatus {
 }
 
 interface IStatusBarModel {
-    persistAmount: number;
     tcpConnections: number;
     tablesAmount: number;
     httpConnections: number;
     location: ILocationStatus,
     masterNode: string,
     syncQueueSize: number
+    mainNodePing: number,
+    connectedToMainNode: boolean
 }
 
 interface ITableModel {

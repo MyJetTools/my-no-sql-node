@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 
 use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, TcpContract};
 use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
@@ -23,9 +23,14 @@ impl TcpClientSocketCallback {
         connection: Arc<TcpConnection>,
     ) {
         match tcp_contract {
-            TcpContract::Ping => {}
-            TcpContract::Pong => {}
-
+            TcpContract::Pong => {
+                if let Some(duration) = connection.statistics.get_ping_pong_duration() {
+                    let microseconds = duration.as_micros();
+                    self.app
+                        .master_node_ping_interval
+                        .store(microseconds as i64, Ordering::SeqCst);
+                }
+            }
             TcpContract::InitTable { table_name, data } => {
                 crate::db_operations::sync_from_main::sync_table(
                     &self.app,
@@ -103,8 +108,15 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
 
                     connection.send(contract).await;
                 }
+                self.app
+                    .connected_to_main_node
+                    .store(true, Ordering::SeqCst);
             }
-            ConnectionEvent::Disconnected(_connection) => {}
+            ConnectionEvent::Disconnected(_connection) => {
+                self.app
+                    .connected_to_main_node
+                    .store(false, Ordering::SeqCst);
+            }
             ConnectionEvent::Payload {
                 connection,
                 payload,

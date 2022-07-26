@@ -76,7 +76,7 @@ class HtmlSubscribersGenerator {
 
 
     private static generateTablesHtml(tables: ITableModel[]): string {
-        let html = `<table class="table table-striped"><tr><th>Table</th><th>Persist</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>`;
+        let html = `<table class="table table-striped"><tr><th>Table</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>`;
 
         let total_size = 0;
         let total_partitions = 0;
@@ -86,36 +86,11 @@ class HtmlSubscribersGenerator {
 
             let style = ' style="color:green" ';
 
-
-            if (!table.lastPersistTime) {
-                style = ' style="color:gray" ';
-            }
-            else
-                if (table.lastPersistTime < table.lastUpdateTime) {
-                    style = ' style="color:red" ';
-                }
-
             let lastUpdateTime = new Date(table.lastUpdateTime / 1000);
 
-            let lastPersistTime = "----";
 
-            if (table.lastPersistTime) {
-                lastPersistTime = new Date(table.lastPersistTime / 1000).toISOString();
-            }
-
-
-            let nextPersistTime = "---";
-
-            if (table.nextPersistTime) {
-                let as_time = new Date(table.nextPersistTime / 1000);
-                nextPersistTime = as_time.toISOString();
-            }
-
-
-
-            html += '<tr><td>' + table.name + '</td><td>' + table.persistAmount + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
-                '<td' + style + '><div>UpdateTime: ' + lastUpdateTime.toISOString() + '</div><div>PersistTime: ' + lastPersistTime + '</div>' +
-                '<div>NextPersist: ' + nextPersistTime + '</div>' + HtmlGraph.renderGraph(table.lastPersistDuration, v => Utils.format_duration(v), v => v, v => false) + '</td></tr>';
+            html += '<tr><td>' + table.name + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
+                '<td' + style + '><div>UpdateTime: ' + lastUpdateTime.toISOString() + '</div></td></tr>';
 
             total_size += table.dataSize;
             total_partitions += table.partitionsCount;

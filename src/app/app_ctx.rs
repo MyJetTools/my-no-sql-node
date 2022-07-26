@@ -1,4 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicI64},
+        Arc,
+    },
+    time::Duration,
+};
 
 use my_no_sql_core::db::DbInstance;
 use my_tcp_sockets::TcpClient;
@@ -34,6 +40,9 @@ pub struct AppContext {
     pub sync: EventsLoop<SyncEvent>,
     pub states: Arc<AppStates>,
     pub tcp_client: TcpClient,
+
+    pub master_node_ping_interval: AtomicI64,
+    pub connected_to_main_node: AtomicBool,
 }
 
 impl AppContext {
@@ -48,7 +57,7 @@ impl AppContext {
             logs,
             metrics: PrometheusMetrics::new(),
             process_id: uuid::Uuid::new_v4().to_string(),
-            states: Arc::new(AppStates::create_un_initialized()),
+            states: Arc::new(AppStates::create_initialized()),
 
             data_readers: DataReadersList::new(Duration::from_secs(30)),
             multipart_list: MultipartList::new(),
@@ -56,6 +65,8 @@ impl AppContext {
             settings,
             sync: EventsLoop::new("SyncEventsLoop".to_string()),
             tcp_client,
+            master_node_ping_interval: AtomicI64::new(0),
+            connected_to_main_node: AtomicBool::new(false),
         }
     }
 }
