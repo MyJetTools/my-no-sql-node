@@ -23,8 +23,18 @@ pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<Db
 
     let db_table = Arc::new(db_table);
 
-    let mut write_access = app.db.tables.write().await;
-    write_access.insert(table_name.to_string(), db_table.clone());
+    {
+        let mut write_access = app.db.tables.write().await;
+        write_access.insert(table_name.to_string(), db_table.clone());
+    }
+
+    let data_readers = app.data_readers.get_all().await;
+
+    for data_reader in data_readers {
+        if data_reader.has_awaiting_table(table_name).await {
+            data_reader.subscribe(db_table.clone()).await;
+        }
+    }
 
     db_table
 }

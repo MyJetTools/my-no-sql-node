@@ -1,8 +1,5 @@
 use std::{
-    sync::{
-        atomic::{AtomicBool, AtomicI64},
-        Arc,
-    },
+    sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
 
@@ -18,6 +15,7 @@ use crate::{
 };
 
 use super::{
+    connection_to_main_node::ConnectionToMainNode,
     logs::{Logs, SystemProcess},
     PrometheusMetrics,
 };
@@ -42,7 +40,7 @@ pub struct AppContext {
     pub tcp_client: TcpClient,
 
     pub master_node_ping_interval: AtomicI64,
-    pub connected_to_main_node: AtomicBool,
+    pub connected_to_main_node: ConnectionToMainNode,
 }
 
 impl AppContext {
@@ -66,7 +64,7 @@ impl AppContext {
             sync: EventsLoop::new("SyncEventsLoop".to_string()),
             tcp_client,
             master_node_ping_interval: AtomicI64::new(0),
-            connected_to_main_node: AtomicBool::new(false),
+            connected_to_main_node: ConnectionToMainNode::new(),
         }
     }
 }

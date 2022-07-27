@@ -6,9 +6,6 @@ use tokio::{fs::File, io::AsyncReadExt};
 pub struct SettingsModel {
     #[serde(rename = "Location")]
     pub location: String,
-    #[serde(rename = "Tables")]
-    pub tables: Vec<String>,
-
     #[serde(rename = "MainServer")]
     pub main_server: String,
 }

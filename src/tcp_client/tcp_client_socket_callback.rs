@@ -5,7 +5,7 @@ use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
 
 use crate::{app::AppContext, db_sync::EventSource};
 
-pub type TcpConnection =
+pub type DataReaderTcpConnection =
     my_tcp_sockets::tcp_connection::SocketConnection<TcpContract, MyNoSqlReaderTcpSerializer>;
 
 pub struct TcpClientSocketCallback {
@@ -20,7 +20,7 @@ impl TcpClientSocketCallback {
     pub async fn handle_incoming_packet(
         &self,
         tcp_contract: TcpContract,
-        connection: Arc<TcpConnection>,
+        connection: Arc<DataReaderTcpConnection>,
     ) {
         match tcp_contract {
             TcpContract::Pong => {
@@ -81,6 +81,13 @@ impl TcpClientSocketCallback {
                     Some(format!("{:?}", connection.id)),
                 );
             }
+            TcpContract::TablesNotFound { tables } => {
+                connection
+                    .send(TcpContract::Error {
+                        message: format!("tables not found: {:?}", tables),
+                    })
+                    .await;
+            }
             _ => {}
         }
     }
@@ -101,21 +108,22 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
 
                 connection.send(contract).await;
 
-                for table in &self.app.settings.tables {
-                    let contract = TcpContract::Subscribe {
-                        table_name: table.to_string(),
+                let tables = self.app.db.get_tables().await;
+
+                if tables.len() > 0 {
+                    let table_names = tables.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+
+                    let contract = TcpContract::SubscribeAsNode {
+                        tables: table_names,
                     };
 
                     connection.send(contract).await;
                 }
-                self.app
-                    .connected_to_main_node
-                    .store(true, Ordering::SeqCst);
+
+                self.app.connected_to_main_node.connected(connection).await;
             }
             ConnectionEvent::Disconnected(_connection) => {
-                self.app
-                    .connected_to_main_node
-                    .store(false, Ordering::SeqCst);
+                self.app.connected_to_main_node.disconnected().await
             }
             ConnectionEvent::Payload {
                 connection,

@@ -42,7 +42,7 @@ impl StatusBarModel {
             http_connections,
             tables_amount,
             main_node_ping: app.master_node_ping_interval.load(Ordering::Relaxed),
-            connected_to_main_node: app.connected_to_main_node.load(Ordering::Relaxed),
+            connected_to_main_node: app.connected_to_main_node.has_connection(),
         }
     }
 }

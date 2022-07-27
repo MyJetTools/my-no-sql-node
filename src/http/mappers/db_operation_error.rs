@@ -101,6 +101,21 @@ impl From<DbOperationError> for HttpFailResult {
                     write_telemetry: true,
                 }
             }
+            DbOperationError::NoConnectionToMainNode => {
+                let err_model = OperationFailHttpContract {
+                    reason: OperationFailReason::JsonParseFail,
+                    message: format!("{:?}", src),
+                };
+
+                let content = serde_json::to_vec(&err_model).unwrap();
+
+                HttpFailResult {
+                    content_type: WebContentType::Json,
+                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
+                    content,
+                    write_telemetry: true,
+                }
+            }
         }
     }
 }

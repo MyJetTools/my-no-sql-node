@@ -1,11 +1,14 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use my_no_sql_core::db::DbTable;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use super::{DataReaderConnection, DataReaderUpdatableData};
 
@@ -24,6 +27,7 @@ pub struct DataReader {
     data: RwLock<DataReaderUpdatableData>,
     pub connection: DataReaderConnection,
     has_first_init: AtomicBool,
+    awating_tables: Mutex<HashMap<String, DateTimeAsMicroseconds>>,
 }
 
 impl DataReader {
@@ -33,7 +37,20 @@ impl DataReader {
             data: RwLock::new(DataReaderUpdatableData::new()),
             connection,
             has_first_init: AtomicBool::new(false),
+            awating_tables: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub async fn add_awaiting_tables(&self, table_name: String) {
+        let mut write_access = self.awating_tables.lock().await;
+        write_access.insert(table_name, DateTimeAsMicroseconds::now());
+        //TODO - Make awaiting tables GC
+    }
+
+    pub async fn has_awaiting_table(&self, table_name: &str) -> bool {
+        let mut write_access = self.awating_tables.lock().await;
+        let result = write_access.remove(table_name);
+        result.is_some()
     }
 
     pub fn has_first_init(&self) -> bool {

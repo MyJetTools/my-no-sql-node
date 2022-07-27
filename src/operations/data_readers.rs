@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use my_no_sql_tcp_shared::TcpContract;
+
 use crate::{
     app::AppContext,
     data_readers::DataReader,
@@ -16,12 +18,30 @@ pub async fn subscribe(
 
     if table.is_none() {
         println!(
-            "{:?} is subscribing to the table {} which does not exist",
+            "{:?} is subscribing to the table {} which does not exist. Trying to subscribe to main node",
             data_reader.get_name().await,
             table_name
         );
 
-        return Err(DbOperationError::TableNotFound(table_name.to_string()));
+        let node_connection = app.connected_to_main_node.get().await;
+
+        if node_connection.is_none() {
+            return Err(DbOperationError::NoConnectionToMainNode);
+        }
+
+        data_reader
+            .add_awaiting_tables(table_name.to_string())
+            .await;
+
+        let node_connection = node_connection.unwrap();
+
+        node_connection
+            .send(TcpContract::SubscribeAsNode {
+                tables: vec![table_name.to_string()],
+            })
+            .await;
+
+        return Ok(());
     }
 
     let db_table = table.unwrap();

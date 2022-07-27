@@ -11,6 +11,7 @@ pub enum DbOperationError {
     TableNameValidationError(String),
     ApplicationIsNotInitializedYet,
     DbEntityParseFail(DbEntityParseFail),
+    NoConnectionToMainNode,
 }
 
 impl DbOperationError {
