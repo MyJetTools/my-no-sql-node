@@ -81,12 +81,16 @@ impl TcpClientSocketCallback {
                     Some(format!("{:?}", connection.id)),
                 );
             }
-            TcpContract::TablesNotFound { tables } => {
-                connection
-                    .send(TcpContract::Error {
-                        message: format!("tables not found: {:?}", tables),
-                    })
-                    .await;
+            TcpContract::TableNotFound(table_name) => {
+                let data_readers = self.app.data_readers.get_all().await;
+
+                for data_reader in data_readers {
+                    if data_reader.has_awaiting_table(table_name.as_str()).await {
+                        data_reader
+                            .send_error_to_client(format!("Table {} not found", table_name))
+                            .await
+                    }
+                }
             }
             _ => {}
         }
@@ -110,13 +114,8 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
 
                 let tables = self.app.db.get_tables().await;
 
-                if tables.len() > 0 {
-                    let table_names = tables.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
-
-                    let contract = TcpContract::SubscribeAsNode {
-                        tables: table_names,
-                    };
-
+                for table in tables {
+                    let contract = TcpContract::SubscribeAsNode(table.name.to_string());
                     connection.send(contract).await;
                 }
 

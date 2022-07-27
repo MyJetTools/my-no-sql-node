@@ -36,9 +36,7 @@ pub async fn subscribe(
         let node_connection = node_connection.unwrap();
 
         node_connection
-            .send(TcpContract::SubscribeAsNode {
-                tables: vec![table_name.to_string()],
-            })
+            .send(TcpContract::SubscribeAsNode(table_name.to_string()))
             .await;
 
         return Ok(());

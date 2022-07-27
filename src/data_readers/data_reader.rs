@@ -7,6 +7,7 @@ use std::{
 };
 
 use my_no_sql_core::db::DbTable;
+use my_no_sql_tcp_shared::TcpContract;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio::sync::{Mutex, RwLock};
 
@@ -81,6 +82,13 @@ impl DataReader {
     pub async fn subscribe(&self, db_table: Arc<DbTable>) {
         let mut write_access = self.data.write().await;
         write_access.subscribe(db_table);
+    }
+
+    pub async fn send_error_to_client(&self, message: String) {
+        if let DataReaderConnection::Tcp(tcp) = &self.connection {
+            let error = TcpContract::Error { message };
+            tcp.send(error.serialize().as_slice()).await;
+        }
     }
 
     fn get_ip(&self) -> String {
