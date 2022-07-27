@@ -36,7 +36,7 @@ impl StatusBarModel {
         Self {
             location: LocationModel {
                 id: app.settings.location.to_string(),
-                compress: false,
+                compress: app.settings.compress,
             },
             tcp_connections,
             http_connections,

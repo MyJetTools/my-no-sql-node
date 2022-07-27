@@ -129,7 +129,11 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
                 connection,
                 payload,
             } => {
+                if let TcpContract::CompressedPayload(data) = &payload {
+                    println!("CompressedPayload: {}", data.len());
+                }
                 let payload = payload.decompress_if_compressed().await.unwrap();
+
                 self.handle_incoming_packet(payload, connection).await;
             }
         }
