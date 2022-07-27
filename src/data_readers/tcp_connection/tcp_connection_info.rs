@@ -9,15 +9,9 @@ use crate::tcp::MyNoSqlTcpConnection;
 
 use super::SendPerSecond;
 
-pub enum ReaderName {
-    AsReader(String),
-    AsNode { location: String, version: String },
-    None,
-}
-
 pub struct TcpConnectionInfo {
     pub connection: Arc<MyNoSqlTcpConnection>,
-    pub name: Mutex<ReaderName>,
+    pub name: Mutex<Option<String>>,
     sent_per_second_accumulator: AtomicUsize,
     pub sent_per_second: SendPerSecond,
     pub is_node: AtomicBool,
@@ -27,7 +21,7 @@ impl TcpConnectionInfo {
     pub fn new(connection: Arc<MyNoSqlTcpConnection>) -> Self {
         Self {
             connection,
-            name: Mutex::new(ReaderName::None),
+            name: Mutex::new(None),
             sent_per_second_accumulator: AtomicUsize::new(0),
             sent_per_second: SendPerSecond::new(),
             is_node: AtomicBool::new(false),
@@ -51,23 +45,12 @@ impl TcpConnectionInfo {
 
     pub async fn get_name(&self) -> Option<String> {
         let read_access = self.name.lock().await;
-
-        match &*read_access {
-            ReaderName::AsReader(name) => Some(name.clone()),
-            ReaderName::AsNode { location, version } => Some(format!("{}:{}", location, version)),
-            ReaderName::None => None,
-        }
+        read_access.clone()
     }
 
     pub async fn set_name_as_reader(&self, name: String) {
         let mut write_access = self.name.lock().await;
-        *write_access = ReaderName::AsReader(name);
-    }
-
-    pub async fn set_name_as_node(&self, location: String, version: String) {
-        self.is_node.store(true, Ordering::SeqCst);
-        let mut write_access = self.name.lock().await;
-        *write_access = ReaderName::AsNode { location, version };
+        *write_access = Some(name);
     }
 
     pub async fn send(&self, payload_to_send: &[u8]) {

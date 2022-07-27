@@ -8,6 +8,8 @@ pub struct SettingsModel {
     pub location: String,
     #[serde(rename = "MainServer")]
     pub main_server: String,
+    #[serde(rename = "Compress")]
+    pub compress: bool,
 }
 
 pub async fn read_settings() -> SettingsModel {

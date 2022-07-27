@@ -22,17 +22,6 @@ impl DataReaderConnection {
         }
     }
 
-    pub async fn set_name_as_node(&self, location: String, version: String) {
-        match self {
-            DataReaderConnection::Tcp(tcp_info) => {
-                tcp_info.set_name_as_node(location, version).await
-            }
-            DataReaderConnection::Http(_) => {
-                panic!("Node does not exist in HTTP Mode")
-            }
-        }
-    }
-
     pub async fn one_sec_tick(&self) {
         match self {
             DataReaderConnection::Tcp(tcp_info) => tcp_info.timer_1sec_tick().await,

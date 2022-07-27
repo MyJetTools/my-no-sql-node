@@ -108,6 +108,7 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
                 let contract = TcpContract::GreetingFromNode {
                     node_location: self.app.settings.location.to_string(),
                     node_version: crate::app::APP_VERSION.to_string(),
+                    compress: self.app.settings.compress,
                 };
 
                 connection.send(contract).await;
@@ -127,7 +128,10 @@ impl SocketEventCallback<TcpContract, MyNoSqlReaderTcpSerializer> for TcpClientS
             ConnectionEvent::Payload {
                 connection,
                 payload,
-            } => self.handle_incoming_packet(payload, connection).await,
+            } => {
+                let payload = payload.decompress_if_compressed().await.unwrap();
+                self.handle_incoming_packet(payload, connection).await;
+            }
         }
     }
 }

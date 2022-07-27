@@ -71,10 +71,6 @@ impl DataReader {
         self.connection.set_name_as_reader(name).await;
     }
 
-    pub async fn set_name_as_node(&self, location: String, version: String) {
-        self.connection.set_name_as_node(location, version).await;
-    }
-
     pub async fn get_name(&self) -> Option<String> {
         self.connection.get_name().await
     }
