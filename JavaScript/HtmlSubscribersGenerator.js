@@ -2,24 +2,11 @@ var HtmlSubscribersGenerator = /** @class */ (function () {
     function HtmlSubscribersGenerator() {
     }
     HtmlSubscribersGenerator.generateHtml = function (data) {
-        var nodes = [];
-        var readers = [];
-        for (var _i = 0, _a = data.readers; _i < _a.length; _i++) {
-            var reader = _a[_i];
-            if (reader.isNode) {
-                nodes.push(reader);
-            }
-            else {
-                readers.push(reader);
-            }
-        }
-        return '<h3>Connected Nodes</h3>'
-            + this.generateReadersHtml(nodes)
-            + '<h3>Readers</h3>'
+        return '<h3>Readers</h3>'
             + this.generateTotalSend(data.readers)
-            + this.generateReadersHtml(readers)
+            + this.generateReadersHtml(data.readers)
             + '<h3>Tables</h3>'
-            + this.generateTablesHtml(data.tables);
+            + this.generateTablesHtml(data.tables, data.readers);
     };
     HtmlSubscribersGenerator.generateTotalSend = function (data) {
         var total = [];
@@ -54,8 +41,22 @@ var HtmlSubscribersGenerator = /** @class */ (function () {
             '<div><b>S:</b>' + reader.pendingToSend + '</div>' +
             '</td></tr>';
     };
-    HtmlSubscribersGenerator.generateTablesHtml = function (tables) {
-        var html = "<table class=\"table table-striped\"><tr><th>Table</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>";
+    HtmlSubscribersGenerator.getSubscribersAmount = function (readers, tableName) {
+        var result = 0;
+        for (var _i = 0, readers_1 = readers; _i < readers_1.length; _i++) {
+            var reader = readers_1[_i];
+            for (var _a = 0, _b = reader.tables; _a < _b.length; _a++) {
+                var table = _b[_a];
+                if (table === tableName) {
+                    result++;
+                    break;
+                }
+            }
+        }
+        return result;
+    };
+    HtmlSubscribersGenerator.generateTablesHtml = function (tables, readers) {
+        var html = "<table class=\"table table-striped\"><tr><th>Table</th><th>Subscribers</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>";
         var total_size = 0;
         var total_partitions = 0;
         var total_records = 0;
@@ -64,7 +65,7 @@ var HtmlSubscribersGenerator = /** @class */ (function () {
             var table = _a[_i];
             var style = ' style="color:green" ';
             var lastUpdateTime = new Date(table.lastUpdateTime / 1000);
-            html += '<tr><td>' + table.name + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
+            html += '<tr><td>' + table.name + '</td><td>' + this.getSubscribersAmount(readers, table.name).toFixed(0) + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
                 '<td' + style + '><div>UpdateTime: ' + lastUpdateTime.toISOString() + '</div></td></tr>';
             total_size += table.dataSize;
             total_partitions += table.partitionsCount;

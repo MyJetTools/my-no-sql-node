@@ -24,6 +24,7 @@ pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<Db
     let db_table = Arc::new(db_table);
 
     {
+        println!("Lazy initializing table: {}", table_name);
         let mut write_access = app.db.tables.write().await;
         write_access.insert(table_name.to_string(), db_table.clone());
     }
@@ -32,7 +33,12 @@ pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<Db
 
     for data_reader in data_readers {
         if data_reader.has_awaiting_table(table_name).await {
-            data_reader.subscribe(db_table.clone()).await;
+            let result =
+                crate::operations::data_readers::subscribe(app, data_reader, table_name).await;
+
+            if let Err(err) = result {
+                println!("Error subscribing to table: {:?}", err);
+            }
         }
     }
 

@@ -49,7 +49,7 @@ interface IStatusBarModel {
 }
 
 interface ITableModel {
-    name: number;
+    name: string;
     partitionsCount: number;
     dataSize: number;
     recordsAmount: number;
