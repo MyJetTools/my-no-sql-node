@@ -3,7 +3,7 @@ use std::sync::Arc;
 use my_http_server::{HttpFailResult, HttpOkResult};
 use rust_extensions::{StopWatch, StringBuilder};
 
-use crate::app::logs::LogItem;
+use my_no_sql_server_core::logs::*;
 
 pub fn compile_result(
     title: &str,
@@ -74,9 +74,10 @@ pub fn compile_result(
 }
 
 fn get_log_level_color(item: &LogItem) -> &str {
+    use my_no_sql_server_core::logs::*;
     match &item.level {
-        crate::app::logs::LogLevel::Info => "green",
-        crate::app::logs::LogLevel::Error => "orange",
-        crate::app::logs::LogLevel::FatalError => "red",
+        LogLevel::Info => "green",
+        LogLevel::Error => "orange",
+        LogLevel::FatalError => "red",
     }
 }

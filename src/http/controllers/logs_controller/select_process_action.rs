@@ -1,6 +1,6 @@
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult};
 
-use crate::app::logs::SystemProcess;
+use my_no_sql_server_core::logs::*;
 
 #[my_http_server_swagger::http_route(
     method: "GET",

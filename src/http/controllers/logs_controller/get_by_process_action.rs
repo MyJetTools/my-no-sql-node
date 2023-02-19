@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
 
+use my_no_sql_server_core::logs::*;
 use rust_extensions::StopWatch;
 
-use crate::app::{logs::SystemProcess, AppContext};
+use crate::app::AppContext;
 
 use super::contracts::GetLogsByProcess;
 

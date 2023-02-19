@@ -82,7 +82,7 @@ impl TcpClientSocketCallback {
                 ctx.insert("connection_id".to_string(), connection.id.to_string());
                 self.app.logs.add_error(
                     None,
-                    crate::app::logs::SystemProcess::TcpSocket,
+                    my_no_sql_server_core::logs::SystemProcess::TcpSocket,
                     "TcoClientError".to_string(),
                     message,
                     Some(ctx),

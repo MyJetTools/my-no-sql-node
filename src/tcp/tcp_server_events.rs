@@ -1,9 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
+use my_no_sql_server_core::logs::*;
 use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_tcp_sockets::{tcp_connection::SocketConnection, ConnectionEvent, SocketEventCallback};
 
-use crate::app::{logs::SystemProcess, AppContext};
+use crate::app::AppContext;
 
 pub type MyNoSqlTcpConnection = SocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer>;
 

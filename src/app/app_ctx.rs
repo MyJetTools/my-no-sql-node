@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use my_no_sql_server_core::DbInstance;
+use my_no_sql_server_core::{logs::*, DbInstance};
 use my_tcp_sockets::TcpClient;
 use rust_extensions::{
     date_time::DateTimeAsMicroseconds, events_loop::EventsLoop, AppStates, Logger,
@@ -18,11 +18,7 @@ use crate::{
     settings_reader::SettingsModel,
 };
 
-use super::{
-    connection_to_main_node::ConnectionToMainNode,
-    logs::{Logs, SystemProcess},
-    PrometheusMetrics,
-};
+use super::{connection_to_main_node::ConnectionToMainNode, PrometheusMetrics};
 
 pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
