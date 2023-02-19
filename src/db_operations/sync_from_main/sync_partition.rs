@@ -16,7 +16,7 @@ pub async fn sync_partition(
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
-    let entities = DbJsonEntity::parse_as_vec(data.as_slice(), &None).unwrap();
+    let entities = DbJsonEntity::restore_as_vec(data.as_slice()).unwrap();
 
     let mut table_data = db_table.data.write().await;
 

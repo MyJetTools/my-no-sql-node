@@ -13,7 +13,8 @@ pub async fn sync_rows(
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
-    let entities = crate::db_operations::parse_json_entity::as_btree_map(data.as_slice()).unwrap();
+    let entities =
+        crate::db_operations::parse_json_entity::restore_as_btree_map(data.as_slice()).unwrap();
 
     let mut table_data = db_table.data.write().await;
 
