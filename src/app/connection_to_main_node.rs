@@ -2,7 +2,7 @@ use std::sync::{atomic::AtomicBool, Arc};
 
 use tokio::sync::RwLock;
 
-use crate::tcp_client::DataReaderTcpConnection;
+use crate::tcp_client_to_main_node::DataReaderTcpConnection;
 
 pub struct ConnectionToMainNode {
     connection: RwLock<Option<Arc<DataReaderTcpConnection>>>,

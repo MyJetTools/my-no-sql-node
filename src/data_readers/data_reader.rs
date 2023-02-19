@@ -6,10 +6,11 @@ use std::{
     },
 };
 
-use my_no_sql_core::db::DbTable;
-use my_no_sql_tcp_shared::TcpContract;
+use my_no_sql_tcp_shared::MyNoSqlTcpContract;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio::sync::{Mutex, RwLock};
+
+use my_no_sql_server_core::DbTableWrapper;
 
 use super::{DataReaderConnection, DataReaderUpdatableData};
 
@@ -75,14 +76,14 @@ impl DataReader {
         self.connection.get_name().await
     }
 
-    pub async fn subscribe(&self, db_table: Arc<DbTable>) {
+    pub async fn subscribe(&self, db_table: Arc<DbTableWrapper>) {
         let mut write_access = self.data.write().await;
         write_access.subscribe(db_table);
     }
 
     pub async fn send_error_to_client(&self, message: String) {
         if let DataReaderConnection::Tcp(tcp) = &self.connection {
-            let error = TcpContract::Error { message };
+            let error = MyNoSqlTcpContract::Error { message };
             tcp.send(error.serialize().as_slice()).await;
         }
     }

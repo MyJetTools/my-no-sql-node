@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use my_no_sql_core::db_json_entity::JsonTimeStamp;
 use my_no_sql_tcp_shared::DeleteRowTcpContract;
 
 use crate::{
@@ -16,19 +15,13 @@ pub async fn delete_rows(
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
-    let now = JsonTimeStamp::now();
-
     let mut table_data = db_table.data.write().await;
 
     let mut sync_data = DeleteRowsEventSyncData::new(&table_data, event_src);
 
     for db_row in rows {
-        let removed_row = table_data.remove_row(
-            db_row.partition_key.as_str(),
-            db_row.row_key.as_str(),
-            true,
-            &now,
-        );
+        let removed_row =
+            table_data.remove_row(db_row.partition_key.as_str(), db_row.row_key.as_str(), true);
 
         if let Some(deleted_row) = removed_row {
             sync_data.add_deleted_row(db_row.partition_key.as_str(), deleted_row.0);

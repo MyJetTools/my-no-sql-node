@@ -73,7 +73,7 @@ class HtmlSubscribersGenerator {
     }
 
     private static generateTablesHtml(tables: ITableModel[], readers: IReaderStatus[]): string {
-        let html = `<table class="table table-striped"><tr><th>Table</th><th>Subscribers</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>`;
+        let html = `<table class="table table-striped"><tr><th>Table</th><th>Subscribers</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Last update</th></tr>`;
 
         let total_size = 0;
         let total_partitions = 0;
@@ -86,13 +86,12 @@ class HtmlSubscribersGenerator {
             let lastUpdateTime = new Date(table.lastUpdateTime / 1000);
 
 
-            html += '<tr><td>' + table.name + '</td><td>' + this.getSubscribersAmount(readers, table.name).toFixed(0) + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
+            html += '<tr><td>' + table.name + '</td><td>' + this.getSubscribersAmount(readers, table.name).toFixed(0) + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td>' +
                 '<td' + style + '><div>UpdateTime: ' + lastUpdateTime.toISOString() + '</div></td></tr>';
 
             total_size += table.dataSize;
             total_partitions += table.partitionsCount;
             total_records += table.recordsAmount;
-            total_indexed_records += table.expirationIndex;
 
         }
 

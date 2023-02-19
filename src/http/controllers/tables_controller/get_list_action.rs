@@ -10,6 +10,7 @@ use super::models::TableContract;
     method: "GET",
     route: "/Tables/List",
     description: "Get List of Tables",
+    summary: "Returns List of Tables",
     controller: "Tables",
     result:[
         {status_code: 200, description: "List of tables", model_as_array: "TableContract"},
@@ -35,7 +36,7 @@ async fn handle_request(
     let mut response: Vec<TableContract> = vec![];
 
     for db_table in &tables {
-        response.push(db_table.as_ref().into());
+        response.push(TableContract::from_table_wrapper(db_table.as_ref()).await);
     }
 
     HttpOutput::as_json(response).into_ok_result(true).into()

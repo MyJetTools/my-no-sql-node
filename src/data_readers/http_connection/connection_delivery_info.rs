@@ -47,7 +47,7 @@ impl HttpConnectionDeliveryInfo {
 
     pub fn ping(&mut self, now: DateTimeAsMicroseconds) {
         let ping_me = if let Some(item) = &self.awaiting_response {
-            now.duration_since(item.created) >= MIN_PING_TIMEOUT
+            now.duration_since(item.created).as_positive_or_zero() >= MIN_PING_TIMEOUT
         } else {
             false
         };

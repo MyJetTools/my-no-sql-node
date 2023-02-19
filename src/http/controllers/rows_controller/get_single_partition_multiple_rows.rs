@@ -1,16 +1,22 @@
 use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult};
-use my_http_server_controllers::controllers::{
-    actions::PostAction,
-    documentation::{out_results::HttpResult, HttpActionDescription},
-};
-use my_no_sql_core::db::UpdateExpirationTimeModel;
 
-use crate::{app::AppContext, http::controllers::row_controller::models::BaseDbRowContract};
+use crate::app::AppContext;
 
 use super::models::GetSinglePartitionMultipleRowsActionInputContract;
 
+#[my_http_server_swagger::http_route(
+    method: "POST",
+    route: "/Rows/SinglePartitionMultipleRows",
+    controller: "Rows",
+    description: "Gets row with highest row_key and below",
+    summary: "Returns row with highest row_key and below",
+    input_data: "GetSinglePartitionMultipleRowsActionInputContract",
+    result:[
+        {status_code: 200, description: "Monitoring snapshot"},
+    ]
+)]
 pub struct GetSinglePartitionMultipleRowsAction {
     app: Arc<AppContext>,
 }
@@ -21,59 +27,25 @@ impl GetSinglePartitionMultipleRowsAction {
     }
 }
 
-#[async_trait::async_trait]
-impl PostAction for GetSinglePartitionMultipleRowsAction {
-    fn get_route(&self) -> &str {
-        "/Rows/SinglePartitionMultipleRows"
-    }
+async fn handle_request(
+    action: &GetSinglePartitionMultipleRowsAction,
+    input_data: GetSinglePartitionMultipleRowsActionInputContract,
+    _ctx: &mut HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    let db_table =
+        crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_ref())
+            .await?;
 
-    fn get_description(&self) -> Option<HttpActionDescription> {
-        HttpActionDescription {
-            controller_name: super::consts::CONTROLLER_NAME,
-            description: "Get Rows Count",
+    let row_keys = serde_json::from_slice(input_data.body.as_slice()).unwrap();
 
-            input_params: GetSinglePartitionMultipleRowsActionInputContract::get_input_params()
-                .into(),
-            results: vec![
-                HttpResult {
-                    http_code: 200,
-                    nullable: false,
-                    description: "Rows".to_string(),
-                    data_type: BaseDbRowContract::get_http_data_structure()
-                        .into_http_data_type_array(),
-                },
-                crate::http::docs::rejects::op_with_table_is_failed(),
-            ],
-        }
-        .into()
-    }
+    let result = crate::db_operations::read::rows::get_single_partition_multiple_rows(
+        &action.app,
+        db_table.as_ref(),
+        &input_data.partition_key,
+        row_keys,
+        input_data.get_update_statistics(),
+    )
+    .await?;
 
-    async fn handle_request(&self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
-        let input_data =
-            GetSinglePartitionMultipleRowsActionInputContract::parse_http_input(ctx).await?;
-
-        let db_table = crate::db_operations::read::table::get(
-            self.app.as_ref(),
-            input_data.table_name.as_ref(),
-        )
-        .await?;
-
-        let row_keys = serde_json::from_slice(input_data.body.as_slice()).unwrap();
-
-        let update_expiration_time = UpdateExpirationTimeModel::new(
-            input_data.set_db_rows_expiration_time.as_ref(),
-            input_data.set_partition_expiration_time.as_ref(),
-        );
-
-        let result = crate::db_operations::read::rows::get_single_partition_multiple_rows(
-            self.app.as_ref(),
-            db_table.as_ref(),
-            input_data.partition_key.as_ref(),
-            row_keys,
-            update_expiration_time,
-        )
-        .await?;
-
-        Ok(result.into())
-    }
+    Ok(result.into())
 }

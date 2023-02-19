@@ -17,6 +17,7 @@ pub enum SystemProcess {
     TableOperation = 3,
     Init = 4,
     Timer = 5,
+    Debug = 6,
 }
 
 impl SystemProcess {
@@ -94,7 +95,7 @@ pub struct LogItem {
 
     pub message: String,
 
-    pub err_ctx: Option<String>,
+    pub err_ctx: Option<HashMap<String, String>>,
 }
 
 struct LogsData {
@@ -130,7 +131,7 @@ impl Logs {
         process: SystemProcess,
         process_name: String,
         message: String,
-        context: Option<String>,
+        context: Option<HashMap<String, String>>,
     ) {
         let logs_data = self.data.clone();
         tokio::spawn(async move {
@@ -168,7 +169,7 @@ impl Logs {
         process: SystemProcess,
         process_name: String,
         message: String,
-        err_ctx: Option<String>,
+        err_ctx: Option<HashMap<String, String>>,
     ) {
         let logs_data = self.data.clone();
 
@@ -193,7 +194,7 @@ impl Logs {
         process: SystemProcess,
         process_name: String,
         message: String,
-        context: Option<String>,
+        context: Option<HashMap<String, String>>,
     ) {
         let logs_data = self.data.clone();
         self.fatal_errors_amount.fetch_add(1, Ordering::SeqCst);
@@ -245,7 +246,7 @@ fn print_to_console(item: &LogItem) {
     println!("Process: {}", item.process_name);
     println!("Message: {}", item.message);
     if let Some(err_ctx) = &item.err_ctx {
-        println!("Err_ctx: {}", err_ctx);
+        println!("Err_ctx: {:?}", err_ctx);
     }
 }
 
@@ -292,6 +293,9 @@ fn should_log_be_printed(item: &LogItem) -> bool {
         SystemProcess::PersistOperation => {}
         SystemProcess::TableOperation => {}
         SystemProcess::Init => {
+            return true;
+        }
+        SystemProcess::Debug => {
             return true;
         }
         SystemProcess::Timer => {}

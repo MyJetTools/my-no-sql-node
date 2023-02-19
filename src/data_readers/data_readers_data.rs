@@ -80,7 +80,11 @@ impl DataReadersData {
         let mut result = None;
 
         for http_session in self.http.values() {
-            if now.duration_since(http_session.get_last_incoming_moment()) >= http_timeout {
+            if now
+                .duration_since(http_session.get_last_incoming_moment())
+                .as_positive_or_zero()
+                >= http_timeout
+            {
                 if result.is_none() {
                     result = Some(Vec::new());
                 }

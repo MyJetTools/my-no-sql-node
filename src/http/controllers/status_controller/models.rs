@@ -1,6 +1,6 @@
 use crate::app::AppContext;
 use my_http_server_swagger::*;
-use rust_extensions::{date_time::DateTimeAsMicroseconds, ApplicationStates};
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::{Deserialize, Serialize};
 
 use super::status_bar_model::StatusBarModel;
@@ -14,8 +14,6 @@ pub struct TableModel {
     pub data_size: usize,
     #[serde(rename = "recordsAmount")]
     pub records_amount: usize,
-    #[serde(rename = "expirationIndex")]
-    pub expiration_index_records_amount: usize,
     #[serde(rename = "lastUpdateTime")]
     pub last_update_time: i64,
 }
@@ -61,7 +59,6 @@ impl StatusModel {
                 name: table.name.clone(),
                 partitions_count: metrics.partitions_amount,
                 data_size: metrics.table_size,
-                expiration_index_records_amount: metrics.expiration_index_records_amount,
                 records_amount: metrics.records_amount,
                 last_update_time: metrics.last_update_time.unix_microseconds,
             };
@@ -117,6 +114,7 @@ async fn get_readers(app: &AppContext) -> (Vec<ReaderModel>, usize, usize) {
                 last_incoming_time: format!(
                     "{:?}",
                     now.duration_since(metrics.last_incoming_moment)
+                        .as_positive_or_zero()
                 ),
                 id: metrics.session_id,
                 ip: metrics.ip,

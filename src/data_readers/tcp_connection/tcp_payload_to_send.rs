@@ -1,4 +1,4 @@
-use my_no_sql_tcp_shared::{DeleteRowTcpContract, TcpContract};
+use my_no_sql_tcp_shared::{DeleteRowTcpContract, MyNoSqlTcpContract};
 
 use crate::db_sync::SyncEvent;
 use my_json::json_reader::consts::EMPTY_ARRAY;
@@ -10,7 +10,7 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
 
             let data = table_snapshot.as_json_array().build();
 
-            let tcp_contract = TcpContract::InitTable {
+            let tcp_contract = MyNoSqlTcpContract::InitTable {
                 table_name: sync_data.db_table.name.to_string(),
                 data,
             };
@@ -19,10 +19,10 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
         }
 
         SyncEvent::InitTable(sync_data) => {
-            let data = sync_data.table_snapshot.as_json_array().build();
+            let data = sync_data.db_table.get_table_as_json_array().await.build();
 
-            let result = TcpContract::InitTable {
-                table_name: sync_data.table_data.table_name.to_string(),
+            let result = MyNoSqlTcpContract::InitTable {
+                table_name: sync_data.db_table.name.to_string(),
                 data,
             };
 
@@ -32,9 +32,9 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
             let mut result = Vec::new();
 
             for (partition_key, snapshot) in &data.partitions_to_update {
-                let contract = TcpContract::InitPartition {
+                let contract = MyNoSqlTcpContract::InitPartition {
                     partition_key: partition_key.to_string(),
-                    table_name: data.table_data.table_name.to_string(),
+                    table_name: data.table_name.to_string(),
                     data: if let Some(db_partition_snapshot) = snapshot {
                         db_partition_snapshot
                             .db_rows_snapshot
@@ -51,8 +51,8 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
             result.into()
         }
         SyncEvent::UpdateRows(data) => {
-            let result = TcpContract::UpdateRows {
-                table_name: data.table_data.table_name.to_string(),
+            let result = MyNoSqlTcpContract::UpdateRows {
+                table_name: data.table_name.to_string(),
                 data: data.rows_by_partition.as_json_array().build(),
             };
             result.serialize().into()
@@ -62,8 +62,8 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
 
             if let Some(deleted_partitions) = &data.deleted_partitions {
                 for (partition_key, _) in deleted_partitions {
-                    TcpContract::InitPartition {
-                        table_name: data.table_data.table_name.to_string(),
+                    MyNoSqlTcpContract::InitPartition {
+                        table_name: data.table_name.to_string(),
                         partition_key: partition_key.to_string(),
                         data: EMPTY_ARRAY.to_vec(),
                     }
@@ -84,8 +84,8 @@ pub async fn serialize(sync_event: &SyncEvent) -> Option<Vec<u8>> {
                         deleted_rows.push(contract);
                     }
 
-                    let contract = TcpContract::DeleteRows {
-                        table_name: data.table_data.table_name.to_string(),
+                    let contract = MyNoSqlTcpContract::DeleteRows {
+                        table_name: data.table_name.to_string(),
                         rows: deleted_rows,
                     };
 

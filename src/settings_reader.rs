@@ -1,3 +1,4 @@
+use my_tcp_sockets::TcpClientSocketSettings;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tokio::{fs::File, io::AsyncReadExt};
@@ -10,6 +11,13 @@ pub struct SettingsModel {
     pub main_server: String,
     #[serde(rename = "Compress")]
     pub compress: bool,
+}
+
+#[async_trait::async_trait]
+impl TcpClientSocketSettings for SettingsModel {
+    async fn get_host_port(&self) -> String {
+        self.main_server.to_string()
+    }
 }
 
 pub async fn read_settings() -> SettingsModel {

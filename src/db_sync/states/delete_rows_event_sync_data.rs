@@ -1,23 +1,21 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use my_json::json_writer::{JsonArrayWriter, JsonObjectWriter};
-use my_no_sql_core::db::{DbRow, DbTableInner};
+use my_no_sql_core::db::{DbRow, DbTable};
 
 use crate::db_sync::EventSource;
 
-use super::SyncTableData;
-
 pub struct DeleteRowsEventSyncData {
-    pub table_data: SyncTableData,
+    pub table_name: String,
     pub event_src: EventSource,
     pub deleted_partitions: Option<BTreeMap<String, ()>>,
     pub deleted_rows: Option<BTreeMap<String, BTreeMap<String, Arc<DbRow>>>>,
 }
 
 impl DeleteRowsEventSyncData {
-    pub fn new(table_data: &DbTableInner, event_src: EventSource) -> Self {
+    pub fn new(db_table: &DbTable, event_src: EventSource) -> Self {
         Self {
-            table_data: SyncTableData::new(table_data),
+            table_name: db_table.name.clone(),
             event_src,
             deleted_partitions: None,
             deleted_rows: None,

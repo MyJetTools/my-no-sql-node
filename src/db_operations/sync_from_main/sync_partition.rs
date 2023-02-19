@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_no_sql_core::db_json_entity::{DbJsonEntity, JsonTimeStamp};
+use my_no_sql_core::db_json_entity::DbJsonEntity;
 
 use crate::{
     app::AppContext,
@@ -16,15 +16,13 @@ pub async fn sync_partition(
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
-    let now = JsonTimeStamp::now();
-
-    let entities = DbJsonEntity::parse_as_vec(data.as_slice(), &now).unwrap();
+    let entities = DbJsonEntity::parse_as_vec(data.as_slice(), &None).unwrap();
 
     let mut table_data = db_table.data.write().await;
 
     table_data.remove_partition(partition_key.as_str());
 
-    table_data.bulk_insert_or_replace(partition_key.as_str(), &entities, &now);
+    table_data.bulk_insert_or_replace(partition_key.as_str(), &entities);
 
     let sync_data = InitPartitionsSyncData::new_as_update_partition(
         &table_data,

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use my_json::json_writer::JsonArrayWriter;
 use my_no_sql_core::db::DbRow;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use rust_extensions::lazy::LazyVec;
 
+/*
 pub struct DbRowsFilter<'s, TIter: Iterator<Item = &'s Arc<DbRow>>> {
     pub iterator: TIter,
     limit: Option<usize>,
@@ -50,19 +50,44 @@ impl<'s, TIter: Iterator<Item = &'s Arc<DbRow>>> Iterator for DbRowsFilter<'s, T
         return Some(result);
     }
 }
+ */
 
 pub fn filter_it<'s, TIter: Iterator<Item = &'s Arc<DbRow>>>(
     iterator: TIter,
     limit: Option<usize>,
     skip: Option<usize>,
-    now: DateTimeAsMicroseconds,
-) -> Vec<u8> {
-    let mut json_array_writer = JsonArrayWriter::new();
+) -> Option<Vec<&'s Arc<DbRow>>> {
+    let mut result = if let Some(limit) = limit {
+        LazyVec::with_capacity(limit)
+    } else {
+        LazyVec::new()
+    };
 
-    for db_row in DbRowsFilter::new(iterator, limit, skip) {
-        json_array_writer.write_raw_element(&db_row.data);
-        db_row.last_read_access.update(now);
+    let mut no = 0;
+    let mut added = 0;
+
+    for db_row in iterator {
+        if let Some(skip) = skip {
+            if no < skip {
+                no += 1;
+                continue;
+            }
+        }
+
+        result.add(db_row);
+        added += 1;
+
+        if let Some(limit) = limit {
+            if added >= limit {
+                break;
+            }
+        }
+
+        no += 1;
+        //json_array_writer.write_raw_element(&db_row.data);
+        //crate::db_operations::sync_to_main::update_row_last_read_access_time(app, db_row);
     }
 
-    json_array_writer.build()
+    result.get_result()
+    //json_array_writer.build()
 }

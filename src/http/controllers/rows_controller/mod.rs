@@ -1,4 +1,3 @@
-mod consts;
 mod get_highest_row_and_below;
 mod get_single_partition_multiple_rows;
 mod models;

@@ -1,29 +1,19 @@
-use my_no_sql_core::db::{db_snapshots::DbTableSnapshot, DbTableAttributesSnapshot, DbTableInner};
+use std::sync::Arc;
+
+use my_no_sql_server_core::DbTableWrapper;
 
 use crate::db_sync::EventSource;
 
-use super::SyncTableData;
-
 pub struct InitTableEventSyncData {
-    pub table_data: SyncTableData,
+    pub db_table: Arc<DbTableWrapper>,
     pub event_src: EventSource,
-    pub table_snapshot: DbTableSnapshot,
 }
 
 impl InitTableEventSyncData {
-    pub fn new(
-        table_data: &DbTableInner,
-        table_attrs: DbTableAttributesSnapshot,
-        event_src: EventSource,
-    ) -> Self {
+    pub fn new(db_table_wrapper: Arc<DbTableWrapper>, event_src: EventSource) -> Self {
         Self {
-            table_data: SyncTableData::new(table_data),
+            db_table: db_table_wrapper,
             event_src,
-            table_snapshot: DbTableSnapshot::new(
-                table_data.get_last_update_time(),
-                table_data,
-                table_attrs,
-            ),
         }
     }
 }

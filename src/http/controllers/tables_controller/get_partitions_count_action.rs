@@ -9,6 +9,7 @@ use std::{result::Result, sync::Arc};
     route: "/Tables/PartitionsCount",
     input_data: "GetPartitionsAmountContract",
     description: "Get Partitions amount of selected table",
+    summary: "Returns Partitions amount of selected table",
     controller: "Tables",
     result:[
         {status_code: 200, description: "Partitions amount", model: "Long"},

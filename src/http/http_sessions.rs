@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use my_http_server::{HttpFailResult, WebContentType};
-use my_http_server_controllers::controllers::documentation::{
-    data_types::HttpDataType, out_results::HttpResult,
-};
+
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use crate::{
@@ -32,6 +30,7 @@ impl HttpSessionsSupport for AppContext {
             status_code: SESSION_NOT_FOUND_HTTP_CODE,
             content: "Session not found".to_string().into_bytes(),
             write_telemetry: false,
+            write_to_log: true,
         };
 
         Err(err)
@@ -39,11 +38,3 @@ impl HttpSessionsSupport for AppContext {
 }
 
 const SESSION_NOT_FOUND_HTTP_CODE: u16 = 403;
-pub fn session_not_found_result_description() -> HttpResult {
-    HttpResult {
-        http_code: SESSION_NOT_FOUND_HTTP_CODE,
-        nullable: true,
-        description: "Session not found".to_string(),
-        data_type: HttpDataType::as_string(),
-    }
-}

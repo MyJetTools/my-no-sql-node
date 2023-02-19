@@ -1,16 +1,20 @@
 use std::{
+    collections::HashMap,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
 
-use my_no_sql_core::db::DbInstance;
+use my_no_sql_server_core::DbInstance;
 use my_tcp_sockets::TcpClient;
 use rust_extensions::{
     date_time::DateTimeAsMicroseconds, events_loop::EventsLoop, AppStates, Logger,
 };
 
 use crate::{
-    data_readers::DataReadersList, db_operations::multipart::MultipartList, db_sync::SyncEvent,
+    background::sync_to_main_node::SyncToMainNodeEvent,
+    data_readers::DataReadersList,
+    db_operations::{multipart::MultipartList, sync_to_main::SyncToMainNodeQueues},
+    db_sync::SyncEvent,
     settings_reader::SettingsModel,
 };
 
@@ -35,20 +39,21 @@ pub struct AppContext {
 
     pub multipart_list: MultipartList,
     pub settings: Arc<SettingsModel>,
-    pub sync: EventsLoop<SyncEvent>,
+    pub sync_to_client_events_loop: EventsLoop<SyncEvent>,
     pub states: Arc<AppStates>,
-    pub tcp_client: TcpClient,
+    pub node_connection_tcp_client: TcpClient,
 
     pub master_node_ping_interval: AtomicI64,
     pub connected_to_main_node: ConnectionToMainNode,
+
+    pub sync_to_main_node_queue: SyncToMainNodeQueues,
+    pub sync_to_main_node_events_loop: EventsLoop<SyncToMainNodeEvent>,
 }
 
 impl AppContext {
     pub fn new(logs: Arc<Logs>, settings: Arc<SettingsModel>) -> Self {
-        let tcp_client = TcpClient::new(
-            "NodeConnection".to_string(),
-            settings.main_server.to_string(),
-        );
+        let node_connection_tcp_client =
+            TcpClient::new("NodeConnection".to_string(), settings.clone());
         AppContext {
             created: DateTimeAsMicroseconds::now(),
             db: DbInstance::new(),
@@ -61,32 +66,64 @@ impl AppContext {
             multipart_list: MultipartList::new(),
 
             settings,
-            sync: EventsLoop::new("SyncEventsLoop".to_string()),
-            tcp_client,
+            sync_to_client_events_loop: EventsLoop::new("SyncEventsLoop".to_string()),
+            node_connection_tcp_client,
             master_node_ping_interval: AtomicI64::new(0),
             connected_to_main_node: ConnectionToMainNode::new(),
+            sync_to_main_node_queue: SyncToMainNodeQueues::new(),
+            sync_to_main_node_events_loop: EventsLoop::new("SyncToMainPusher".to_string()),
         }
     }
 }
 
 impl Logger for AppContext {
-    fn write_info(&self, process_name: String, message: String, context: Option<String>) {
+    fn write_info(
+        &self,
+        process_name: String,
+        message: String,
+        context: Option<HashMap<String, String>>,
+    ) {
         self.logs
             .add_info(None, SystemProcess::System, process_name, message, context);
     }
 
-    fn write_error(&self, process_name: String, message: String, context: Option<String>) {
+    fn write_error(
+        &self,
+        process_name: String,
+        message: String,
+        context: Option<HashMap<String, String>>,
+    ) {
         self.logs
             .add_fatal_error(None, SystemProcess::System, process_name, message, context);
     }
 
-    fn write_warning(&self, process_name: String, message: String, ctx: Option<String>) {
+    fn write_warning(
+        &self,
+        process_name: String,
+        message: String,
+        ctx: Option<HashMap<String, String>>,
+    ) {
         self.logs
             .add_error(None, SystemProcess::System, process_name, message, ctx);
     }
 
-    fn write_fatal_error(&self, process_name: String, message: String, ctx: Option<String>) {
+    fn write_fatal_error(
+        &self,
+        process_name: String,
+        message: String,
+        ctx: Option<HashMap<String, String>>,
+    ) {
         self.logs
             .add_error(None, SystemProcess::System, process_name, message, ctx);
+    }
+
+    fn write_debug_info(
+        &self,
+        process_name: String,
+        message: String,
+        ctx: Option<HashMap<String, String>>,
+    ) {
+        self.logs
+            .add_error(None, SystemProcess::Debug, process_name, message, ctx);
     }
 }

@@ -56,7 +56,7 @@ var HtmlSubscribersGenerator = /** @class */ (function () {
         return result;
     };
     HtmlSubscribersGenerator.generateTablesHtml = function (tables, readers) {
-        var html = "<table class=\"table table-striped\"><tr><th>Table</th><th>Subscribers</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Indexed Records</th><th>Last update</th></tr>";
+        var html = "<table class=\"table table-striped\"><tr><th>Table</th><th>Subscribers</th><th>DataSize</th><th>Partitions</th><th>Records</th><th>Last update</th></tr>";
         var total_size = 0;
         var total_partitions = 0;
         var total_records = 0;
@@ -65,12 +65,11 @@ var HtmlSubscribersGenerator = /** @class */ (function () {
             var table = _a[_i];
             var style = ' style="color:green" ';
             var lastUpdateTime = new Date(table.lastUpdateTime / 1000);
-            html += '<tr><td>' + table.name + '</td><td>' + this.getSubscribersAmount(readers, table.name).toFixed(0) + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td><td>' + table.expirationIndex + '</td>' +
+            html += '<tr><td>' + table.name + '</td><td>' + this.getSubscribersAmount(readers, table.name).toFixed(0) + '</td><td>' + table.dataSize + '</td><td>' + table.partitionsCount + '</td><td>' + table.recordsAmount + '</td>' +
                 '<td' + style + '><div>UpdateTime: ' + lastUpdateTime.toISOString() + '</div></td></tr>';
             total_size += table.dataSize;
             total_partitions += table.partitionsCount;
             total_records += table.recordsAmount;
-            total_indexed_records += table.expirationIndex;
         }
         html += '<tr style="font-weight: bold; background-color:black; color:white;"><td>Total</td><td></td><td>DataSize: ' + total_size + '</td><td>Partitions: ' + total_partitions + '</td><td>Records: ' + total_records + '</td><td>Indexed records: ' + total_indexed_records + '</td>'
             + '<td></td></tr>';

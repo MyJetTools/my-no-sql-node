@@ -1,7 +1,7 @@
 use crate::{app::AppContext, data_readers::DataReaderConnection, db_sync::SyncEvent};
 
 pub fn dispatch(app: &AppContext, sync_event: SyncEvent) {
-    app.sync.send(sync_event);
+    app.sync_to_client_events_loop.send(sync_event);
 }
 
 pub async fn sync(app: &AppContext, sync_event: &SyncEvent) {

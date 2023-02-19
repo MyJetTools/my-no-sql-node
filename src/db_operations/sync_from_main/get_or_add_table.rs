@@ -1,32 +1,25 @@
 use std::sync::Arc;
 
-use my_no_sql_core::db::{DbTable, DbTableAttributesSnapshot, DbTableInner};
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use my_no_sql_core::db::DbTable;
+use my_no_sql_server_core::DbTableWrapper;
 
 use crate::app::AppContext;
 
-pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<DbTable> {
+pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<DbTableWrapper> {
     let db_table = app.db.get_table(table_name).await;
 
     if db_table.is_some() {
         return db_table.unwrap();
     }
 
-    let now = DateTimeAsMicroseconds::now();
-    let db_table_inner = DbTableInner::new(table_name.to_string(), now);
-    let attr = DbTableAttributesSnapshot {
-        persist: false,
-        max_partitions_amount: None,
-        created: now,
-    };
-    let db_table = DbTable::new(db_table_inner, attr);
+    let db_table = DbTable::new(table_name.to_string());
 
-    let db_table = Arc::new(db_table);
+    let db_table_wrapper = DbTableWrapper::new(db_table);
 
     {
         println!("Lazy initializing table: {}", table_name);
         let mut write_access = app.db.tables.write().await;
-        write_access.insert(table_name.to_string(), db_table.clone());
+        write_access.insert(table_name.to_string(), db_table_wrapper.clone());
     }
 
     let data_readers = app.data_readers.get_all().await;
@@ -42,5 +35,5 @@ pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<Db
         }
     }
 
-    db_table
+    db_table_wrapper
 }

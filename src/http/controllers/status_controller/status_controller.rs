@@ -2,13 +2,19 @@ use std::sync::Arc;
 
 use crate::app::AppContext;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
-use my_http_server_controllers::controllers::{
-    actions::GetAction,
-    documentation::{out_results::IntoHttpResult, HttpActionDescription},
-};
 
 use super::models::StatusModel;
 
+#[my_http_server_swagger::http_route(
+    method: "GET",
+    route: "/Api/Status",
+    controller: "Monitoring",
+    description: "Monitoring API",
+    summary: "Returns monitoring metrics",
+    result:[
+        {status_code: 200, description: "Monitoring snapshot", model_as_array: "StatusModel"},
+    ]
+)]
 pub struct StatusController {
     app: Arc<AppContext>,
 }
@@ -19,6 +25,7 @@ impl StatusController {
     }
 }
 
+/*
 #[async_trait::async_trait]
 impl GetAction for StatusController {
     fn get_route(&self) -> &str {
@@ -42,8 +49,14 @@ impl GetAction for StatusController {
         .into()
     }
 
-    async fn handle_request(&self, _ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
-        let model = StatusModel::new(self.app.as_ref()).await;
-        HttpOutput::as_json(model).into_ok_result(true).into()
-    }
+
+}
+ */
+
+async fn handle_request(
+    action: &StatusController,
+    _ctx: &mut HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    let model = StatusModel::new(action.app.as_ref()).await;
+    HttpOutput::as_json(model).into_ok_result(true).into()
 }

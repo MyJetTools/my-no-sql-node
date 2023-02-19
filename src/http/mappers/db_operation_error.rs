@@ -21,6 +21,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: true,
+                    write_to_log: false,
                 }
             }
             DbOperationError::TableNotFound(table_name) => {
@@ -31,18 +32,21 @@ impl From<DbOperationError> for HttpFailResult {
                 status_code: 404,
                 content: format!("Record not found").into_bytes(),
                 write_telemetry: false,
+                write_to_log: true,
             },
             DbOperationError::ApplicationIsNotInitializedYet => HttpFailResult {
                 content_type: WebContentType::Json,
                 status_code: 503,
                 content: format!("Application is not initialized yet").into_bytes(),
                 write_telemetry: false,
+                write_to_log: false,
             },
             DbOperationError::OptimisticConcurencyUpdateFails => HttpFailResult {
                 content_type: WebContentType::Json,
                 status_code: 409,
                 content: format!("Record is changed").into_bytes(),
                 write_telemetry: false,
+                write_to_log: false,
             },
             DbOperationError::RecordAlreadyExists => {
                 let err_model = OperationFailHttpContract {
@@ -56,6 +60,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: false,
+                    write_to_log: false,
                 }
             }
             DbOperationError::TimeStampFieldRequires => {
@@ -70,6 +75,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: true,
+                    write_to_log: true,
                 }
             }
             DbOperationError::TableNameValidationError(reason) => {
@@ -84,6 +90,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: true,
+                    write_to_log: true,
                 }
             }
             DbOperationError::DbEntityParseFail(src) => {
@@ -99,6 +106,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: true,
+                    write_to_log: true,
                 }
             }
             DbOperationError::NoConnectionToMainNode => {
@@ -114,6 +122,7 @@ impl From<DbOperationError> for HttpFailResult {
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
                     write_telemetry: true,
+                    write_to_log: true,
                 }
             }
         }

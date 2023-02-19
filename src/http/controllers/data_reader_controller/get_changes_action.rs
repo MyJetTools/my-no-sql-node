@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
-use my_http_server_controllers::controllers::{
-    actions::PostAction,
-    documentation::{data_types::HttpDataType, out_results::HttpResult, HttpActionDescription},
-};
 
 use crate::{
     app::AppContext,
@@ -15,6 +11,17 @@ use crate::{
 
 use super::models::{GetChangesBodyModel, GetChangesInputModel, UpdateExpirationDateTime};
 
+#[my_http_server_swagger::http_route(
+    method: "POST",
+    route: "/DataReader/GetChanges",
+    controller: "DataReader",
+    description: "Get Subscriber changes",
+    summary: "Returns Subscriber changes",
+    input_data: "GetChangesInputModel",
+    result:[
+        {status_code: 200, description: "Successful operation"},
+    ]
+)]
 pub struct GetChangesAction {
     app: Arc<AppContext>,
 }
@@ -24,95 +31,78 @@ impl GetChangesAction {
         Self { app }
     }
 }
-#[async_trait::async_trait]
-impl PostAction for GetChangesAction {
-    fn get_route(&self) -> &str {
-        "/DataReader/GetChanges"
-    }
 
-    fn get_description(&self) -> Option<HttpActionDescription> {
-        HttpActionDescription {
-            controller_name: super::consts::CONTROLLER_NAME,
-            description: "Get Subscriber changes",
+async fn handle_request(
+    action: &GetChangesAction,
+    input_data: GetChangesInputModel,
+    _ctx: &mut HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    let data_reader = action
+        .app
+        .get_http_session(input_data.session_id.as_str())
+        .await?;
 
-            input_params: GetChangesInputModel::get_input_params().into(),
-            results: vec![HttpResult {
-                http_code: 200,
-                nullable: true,
-                description: "Successful operation".to_string(),
-                data_type: HttpDataType::None,
-            }],
-        }
-        .into()
-    }
-
-    async fn handle_request(&self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
-        let input_data = GetChangesInputModel::parse_http_input(ctx).await?;
-
-        let data_reader = self
-            .app
-            .get_http_session(input_data.session_id.as_str())
+    if let Ok(body) = serde_json::from_slice::<GetChangesBodyModel>(&input_data.body) {
+        for update_model in &body.update_expiration_time {
+            update_expiration_time(
+                action.app.as_ref(),
+                update_model.table_name.as_str(),
+                &update_model.items,
+            )
             .await?;
-
-        if let Ok(body) = serde_json::from_slice::<GetChangesBodyModel>(&input_data.body) {
-            for update_model in &body.update_expiration_time {
-                update_expiration_time(
-                    self.app.as_ref(),
-                    update_model.table_name.as_str(),
-                    &update_model.items,
-                )
-                .await?;
-            }
         }
-
-        if let DataReaderConnection::Http(info) = &data_reader.connection {
-            let result = info.new_request().await?;
-            match result {
-                HttpPayload::Ping => return HttpOutput::Empty.into_ok_result(false).into(),
-                HttpPayload::Payload(payload) => {
-                    return HttpOutput::Content {
-                        headers: None,
-                        content_type: None,
-                        content: payload,
-                    }
-                    .into_ok_result(false)
-                    .into();
-                }
-            }
-        }
-
-        return Err(HttpFailResult {
-            content_type: WebContentType::Text,
-            status_code: 400,
-            content: "Only HTTP sessions are supported".to_string().into_bytes(),
-            write_telemetry: true,
-        });
     }
+
+    if let DataReaderConnection::Http(info) = &data_reader.connection {
+        let result = info.new_request().await?;
+        match result {
+            HttpPayload::Ping => return HttpOutput::Empty.into_ok_result(false).into(),
+            HttpPayload::Payload(payload) => {
+                return HttpOutput::Content {
+                    headers: None,
+                    content_type: None,
+                    content: payload,
+                }
+                .into_ok_result(false)
+                .into();
+            }
+        }
+    }
+
+    return Err(HttpFailResult {
+        content_type: WebContentType::Text,
+        status_code: 400,
+        content: "Only HTTP sessions are supported".to_string().into_bytes(),
+        write_telemetry: true,
+        write_to_log: true,
+    });
 }
 
 async fn update_expiration_time(
     app: &AppContext,
     table_name: &str,
-    items: &[UpdateExpirationDateTime],
+    _items: &[UpdateExpirationDateTime],
 ) -> Result<(), DbOperationError> {
     let db_table = app.db.get_table(table_name).await;
     if db_table.is_none() {
         return Ok(());
     }
 
-    let db_table = db_table.unwrap();
-    for item in items {
-        //    let src = EventSource::as_client_request(app);
+    todo!("Not Implemented yet!");
 
-        //let update_expiration = UpdateExpirationTimeModel::new(
-        //    item.set_db_rows_expiration_time.as_ref(),
-        //    item.set_db_partition_expiration_time.as_ref(),
-        //);
+    //let db_table = db_table.unwrap();
+    //for item in items {
+    //    let src = EventSource::as_client_request(app);
 
-        //if let Some(update_expiration) = &update_expiration {
-        //TODO - UpdateExpirationTime to MasterNode
-        //}
-    }
+    //let update_expiration = UpdateExpirationTimeModel::new(
+    //    item.set_db_rows_expiration_time.as_ref(),
+    //    item.set_db_partition_expiration_time.as_ref(),
+    //);
 
-    Ok(())
+    //if let Some(update_expiration) = &update_expiration {
+    //TODO - UpdateExpirationTime to MasterNode
+    //}
+    //   }
+
+    //  Ok(())
 }

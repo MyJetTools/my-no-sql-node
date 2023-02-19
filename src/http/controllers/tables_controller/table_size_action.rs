@@ -11,6 +11,7 @@ use super::models::GetTableSizeContract;
     route: "/Tables/TableSize",
     input_data: "GetTableSizeContract",
     description: "Get Table size",
+    summary: "Returns Table size",
     controller: "Tables",
     result:[
         {status_code: 200, description: "Size of table", model: "Long"},
