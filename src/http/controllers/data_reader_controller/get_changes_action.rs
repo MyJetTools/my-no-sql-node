@@ -93,7 +93,8 @@ async fn update_expiration_time(
             .set_db_partition_expiration_time
             .to_set_expiration_time()
         {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_partition_expiration_time(
                     table_name,
                     &item.partition_key,
@@ -104,7 +105,8 @@ async fn update_expiration_time(
 
         if let Some(set_expiration_time) = item.set_db_rows_expiration_time.to_set_expiration_time()
         {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_rows_expiration_time(
                     table_name,
                     &item.partition_key,

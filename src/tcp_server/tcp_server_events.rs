@@ -87,7 +87,8 @@ impl TcpServerEvents {
             } => {
                 for (partition_key, expiration_time) in partitions {
                     self.app
-                        .sync_to_main_node_queue
+                        .sync_to_main_node
+                        .event_notifier
                         .update_partition_expiration_time(
                             table_name.as_str(),
                             &partition_key,
@@ -109,7 +110,8 @@ impl TcpServerEvents {
                 expiration_time,
             } => {
                 self.app
-                    .sync_to_main_node_queue
+                    .sync_to_main_node
+                    .event_notifier
                     .update_rows_expiration_time(
                         table_name.as_str(),
                         &partition_key,
@@ -130,7 +132,8 @@ impl TcpServerEvents {
                 row_keys,
             } => {
                 self.app
-                    .sync_to_main_node_queue
+                    .sync_to_main_node
+                    .event_notifier
                     .update_rows_last_read_time(
                         table_name.as_str(),
                         &partition_key,
@@ -148,7 +151,8 @@ impl TcpServerEvents {
                 partitions,
             } => {
                 self.app
-                    .sync_to_main_node_queue
+                    .sync_to_main_node
+                    .event_notifier
                     .update_partitions_last_read_time(table_name.as_str(), partitions.iter())
                     .await;
 

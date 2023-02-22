@@ -30,13 +30,15 @@ impl UpdateStatistics {
         db_rows: &[&Arc<DbRow>],
     ) {
         if self.update_partition_last_read_access_time {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_partitions_last_read_time(table_name, [partition_key].into_iter())
                 .await;
         }
 
         if self.update_rows_last_read_access_time {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_rows_last_read_time(
                     table_name,
                     partition_key,
@@ -46,7 +48,8 @@ impl UpdateStatistics {
         }
 
         if let Some(update_partition_expiration_time) = self.update_partition_expiration_time {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_partition_expiration_time(
                     table_name,
                     partition_key,
@@ -56,7 +59,8 @@ impl UpdateStatistics {
         }
 
         if let Some(update_rows_expiration_time) = self.update_rows_expiration_time {
-            app.sync_to_main_node_queue
+            app.sync_to_main_node
+                .event_notifier
                 .update_rows_expiration_time(
                     table_name,
                     partition_key,

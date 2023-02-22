@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio::sync::RwLock;
 
-use crate::tcp::MyNoSqlTcpConnection;
+use crate::tcp_server::MyNoSqlTcpConnection;
 
 use super::{
     http_connection::HttpConnectionInfo, tcp_connection::TcpConnectionInfo, DataReader,

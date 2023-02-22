@@ -5,7 +5,7 @@ use std::sync::{
 
 use tokio::sync::Mutex;
 
-use crate::tcp::MyNoSqlTcpConnection;
+use crate::tcp_server::MyNoSqlTcpConnection;
 
 use super::SendPerSecond;
 

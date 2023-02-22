@@ -2,7 +2,6 @@ use app::AppContext;
 use background::{
     gc_http_sessions::GcHttpSessionsTimer, gc_multipart::GcMultipart,
     metrics_updater::MetricsUpdater, sync_to_client::SyncToClientEventLoop,
-    sync_to_main_node::SyncToMainNodeEventLoop,
 };
 
 use my_no_sql_server_core::logs::Logs;
@@ -10,8 +9,8 @@ use my_no_sql_tcp_shared::MyNoSqlReaderTcpSerializer;
 use my_tcp_sockets::TcpServer;
 use rust_extensions::MyTimer;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tcp::TcpServerEvents;
 use tcp_client_to_main_node::TcpClientSocketCallback;
+use tcp_server::TcpServerEvents;
 
 mod app;
 //mod db;
@@ -21,7 +20,7 @@ mod db_operations;
 mod db_sync;
 mod http;
 
-mod tcp;
+mod tcp_server;
 
 mod background;
 mod data_readers;
@@ -42,11 +41,6 @@ async fn main() {
 
     app.sync_to_client_events_loop
         .register_event_loop(Arc::new(SyncToClientEventLoop::new(app.clone())))
-        .await;
-
-    app.sync_to_main_node_queue
-        .event_loop
-        .register_event_loop(Arc::new(SyncToMainNodeEventLoop::new(app.clone())))
         .await;
 
     let mut timer_1s = MyTimer::new(Duration::from_secs(1));
@@ -71,8 +65,7 @@ async fn main() {
         .start(app.states.clone(), app.clone())
         .await;
 
-    app.sync_to_main_node_queue
-        .event_loop
+    app.sync_to_main_node
         .start(app.states.clone(), app.clone())
         .await;
 

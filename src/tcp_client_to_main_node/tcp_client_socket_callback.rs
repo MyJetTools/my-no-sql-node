@@ -3,7 +3,6 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
-use my_no_sql_core::sync_to_main::SyncToMainNodeEvent;
 use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
 
@@ -103,10 +102,10 @@ impl TcpClientSocketCallback {
 
             MyNoSqlTcpContract::Confirmation { confirmation_id } => {
                 self.app
-                    .sync_to_main_node_queue
-                    .event_loop
-                    .send(SyncToMainNodeEvent::Delivered(confirmation_id));
+                    .sync_to_main_node
+                    .tcp_events_pusher_got_confirmation(confirmation_id);
             }
+
             _ => {}
         }
     }
@@ -143,17 +142,15 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer>
                     .await;
 
                 self.app
-                    .sync_to_main_node_queue
-                    .event_loop
-                    .send(SyncToMainNodeEvent::Connected(connection));
+                    .sync_to_main_node
+                    .tcp_events_pusher_new_connection_established(connection);
             }
             ConnectionEvent::Disconnected(connection) => {
                 self.app.connected_to_main_node.disconnected().await;
 
                 self.app
-                    .sync_to_main_node_queue
-                    .event_loop
-                    .send(SyncToMainNodeEvent::Disconnected(connection));
+                    .sync_to_main_node
+                    .tcp_events_pusher_connection_disconnected(connection);
             }
             ConnectionEvent::Payload {
                 connection,
