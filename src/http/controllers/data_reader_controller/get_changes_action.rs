@@ -6,7 +6,7 @@ use crate::{
     app::AppContext,
     data_readers::{http_connection::HttpPayload, DataReaderConnection},
     db_operations::DbOperationError,
-    http::http_sessions::HttpSessionsSupport,
+    http::{controllers::mappers::ToSetExpirationTime, http_sessions::HttpSessionsSupport},
 };
 
 use super::models::{GetChangesBodyModel, GetChangesInputModel, UpdateExpirationDateTime};
@@ -81,28 +81,39 @@ async fn handle_request(
 async fn update_expiration_time(
     app: &AppContext,
     table_name: &str,
-    _items: &[UpdateExpirationDateTime],
+    items: &[UpdateExpirationDateTime],
 ) -> Result<(), DbOperationError> {
     let db_table = app.db.get_table(table_name).await;
     if db_table.is_none() {
         return Ok(());
     }
 
-    todo!("Not Implemented yet!");
+    for item in items {
+        if let Some(set_expiration_time) = item
+            .set_db_partition_expiration_time
+            .to_set_expiration_time()
+        {
+            app.sync_to_main_node_queue
+                .update_partition_expiration_time(
+                    table_name,
+                    &item.partition_key,
+                    set_expiration_time,
+                )
+                .await;
+        }
 
-    //let db_table = db_table.unwrap();
-    //for item in items {
-    //    let src = EventSource::as_client_request(app);
+        if let Some(set_expiration_time) = item.set_db_rows_expiration_time.to_set_expiration_time()
+        {
+            app.sync_to_main_node_queue
+                .update_rows_expiration_time(
+                    table_name,
+                    &item.partition_key,
+                    item.row_keys.iter(),
+                    set_expiration_time,
+                )
+                .await;
+        }
+    }
 
-    //let update_expiration = UpdateExpirationTimeModel::new(
-    //    item.set_db_rows_expiration_time.as_ref(),
-    //    item.set_db_partition_expiration_time.as_ref(),
-    //);
-
-    //if let Some(update_expiration) = &update_expiration {
-    //TODO - UpdateExpirationTime to MasterNode
-    //}
-    //   }
-
-    //  Ok(())
+    Ok(())
 }

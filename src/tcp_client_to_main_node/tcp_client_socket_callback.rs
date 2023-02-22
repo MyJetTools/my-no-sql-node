@@ -3,6 +3,7 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
+use my_no_sql_core::sync_to_main::SyncToMainNodeEvent;
 use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
 
@@ -101,11 +102,10 @@ impl TcpClientSocketCallback {
             }
 
             MyNoSqlTcpContract::Confirmation { confirmation_id } => {
-                self.app.sync_to_main_node_events_loop.send(
-                    crate::background::sync_to_main_node::SyncToMainNodeEvent::Delivered(
-                        confirmation_id,
-                    ),
-                );
+                self.app
+                    .sync_to_main_node_queue
+                    .event_loop
+                    .send(SyncToMainNodeEvent::Delivered(confirmation_id));
             }
             _ => {}
         }
@@ -142,20 +142,18 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer>
                     .connected(connection.clone())
                     .await;
 
-                self.app.sync_to_main_node_events_loop.send(
-                    crate::background::sync_to_main_node::SyncToMainNodeEvent::Connected(
-                        connection,
-                    ),
-                );
+                self.app
+                    .sync_to_main_node_queue
+                    .event_loop
+                    .send(SyncToMainNodeEvent::Connected(connection));
             }
             ConnectionEvent::Disconnected(connection) => {
                 self.app.connected_to_main_node.disconnected().await;
 
-                self.app.sync_to_main_node_events_loop.send(
-                    crate::background::sync_to_main_node::SyncToMainNodeEvent::Disconnected(
-                        connection,
-                    ),
-                );
+                self.app
+                    .sync_to_main_node_queue
+                    .event_loop
+                    .send(SyncToMainNodeEvent::Disconnected(connection));
             }
             ConnectionEvent::Payload {
                 connection,

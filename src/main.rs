@@ -44,7 +44,8 @@ async fn main() {
         .register_event_loop(Arc::new(SyncToClientEventLoop::new(app.clone())))
         .await;
 
-    app.sync_to_main_node_events_loop
+    app.sync_to_main_node_queue
+        .event_loop
         .register_event_loop(Arc::new(SyncToMainNodeEventLoop::new(app.clone())))
         .await;
 
@@ -70,7 +71,8 @@ async fn main() {
         .start(app.states.clone(), app.clone())
         .await;
 
-    app.sync_to_main_node_events_loop
+    app.sync_to_main_node_queue
+        .event_loop
         .start(app.states.clone(), app.clone())
         .await;
 

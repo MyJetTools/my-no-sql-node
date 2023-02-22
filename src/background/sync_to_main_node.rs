@@ -1,16 +1,7 @@
-use crate::{
-    app::AppContext, db_operations::sync_to_main::DeliverToMainNodeEvent,
-    tcp_client_to_main_node::DataReaderTcpConnection,
-};
+use crate::{app::AppContext, tcp_client_to_main_node::DataReaderTcpConnection};
+use my_no_sql_core::sync_to_main::{DeliverToMainNodeEvent, SyncToMainNodeEvent};
 use rust_extensions::events_loop::EventsLoopTick;
 use std::sync::Arc;
-
-pub enum SyncToMainNodeEvent {
-    Connected(Arc<DataReaderTcpConnection>),
-    Disconnected(Arc<DataReaderTcpConnection>),
-    PingToDeliver,
-    Delivered(i64),
-}
 
 pub struct SyncToMainNodeEventLoop {
     app: Arc<AppContext>,
@@ -23,8 +14,8 @@ impl SyncToMainNodeEventLoop {
 }
 
 #[async_trait::async_trait]
-impl EventsLoopTick<SyncToMainNodeEvent> for SyncToMainNodeEventLoop {
-    async fn tick(&self, event: SyncToMainNodeEvent) {
+impl EventsLoopTick<SyncToMainNodeEvent<DataReaderTcpConnection>> for SyncToMainNodeEventLoop {
+    async fn tick(&self, event: SyncToMainNodeEvent<DataReaderTcpConnection>) {
         match event {
             SyncToMainNodeEvent::Connected(connection) => {
                 self.app

@@ -86,13 +86,14 @@ impl TcpServerEvents {
                 partitions,
             } => {
                 for (partition_key, expiration_time) in partitions {
-                    crate::db_operations::sync_to_main::update_partition_expiration_time(
-                        &self.app,
-                        table_name.as_str(),
-                        &partition_key,
-                        expiration_time,
-                    )
-                    .await;
+                    self.app
+                        .sync_to_main_node_queue
+                        .update_partition_expiration_time(
+                            table_name.as_str(),
+                            &partition_key,
+                            expiration_time,
+                        )
+                        .await;
                 }
 
                 connection
@@ -107,14 +108,15 @@ impl TcpServerEvents {
                 row_keys,
                 expiration_time,
             } => {
-                crate::db_operations::sync_to_main::update_rows_expiration_time(
-                    &self.app,
-                    table_name.as_str(),
-                    partition_key.as_str(),
-                    row_keys.iter(),
-                    expiration_time,
-                )
-                .await;
+                self.app
+                    .sync_to_main_node_queue
+                    .update_rows_expiration_time(
+                        table_name.as_str(),
+                        &partition_key,
+                        row_keys.iter(),
+                        expiration_time,
+                    )
+                    .await;
 
                 connection
                     .send(MyNoSqlTcpContract::Confirmation { confirmation_id })
@@ -127,13 +129,14 @@ impl TcpServerEvents {
                 partition_key,
                 row_keys,
             } => {
-                crate::db_operations::sync_to_main::update_row_keys_last_read_access_time(
-                    &self.app,
-                    table_name.as_str(),
-                    partition_key.as_str(),
-                    row_keys.iter(),
-                )
-                .await;
+                self.app
+                    .sync_to_main_node_queue
+                    .update_rows_last_read_time(
+                        table_name.as_str(),
+                        &partition_key,
+                        row_keys.iter(),
+                    )
+                    .await;
 
                 connection
                     .send(MyNoSqlTcpContract::Confirmation { confirmation_id })
@@ -144,12 +147,10 @@ impl TcpServerEvents {
                 table_name,
                 partitions,
             } => {
-                crate::db_operations::sync_to_main::update_partitions_last_read_time(
-                    &self.app,
-                    table_name.as_str(),
-                    partitions.iter(),
-                )
-                .await;
+                self.app
+                    .sync_to_main_node_queue
+                    .update_partitions_last_read_time(table_name.as_str(), partitions.iter())
+                    .await;
 
                 connection
                     .send(MyNoSqlTcpContract::Confirmation { confirmation_id })

@@ -35,7 +35,7 @@ async fn handle_request(
     let time = DateTimeAsMicroseconds::now();
 
     let response = IsAliveResponse {
-        name: "MyNoSqlServer".to_string(),
+        name: "MyNoSqlServerNode".to_string(),
         time: time.to_rfc3339(),
         version: version.to_string(),
         env_info,

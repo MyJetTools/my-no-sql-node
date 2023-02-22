@@ -10,8 +10,8 @@ use crate::app::AppContext;
 pub struct UpdateStatistics {
     pub update_partition_last_read_access_time: bool,
     pub update_rows_last_read_access_time: bool,
-    pub update_partition_expiration_time: Option<DateTimeAsMicroseconds>,
-    pub update_rows_expiration_time: Option<DateTimeAsMicroseconds>,
+    pub update_partition_expiration_time: Option<Option<DateTimeAsMicroseconds>>,
+    pub update_rows_expiration_time: Option<Option<DateTimeAsMicroseconds>>,
 }
 
 impl UpdateStatistics {
@@ -30,43 +30,40 @@ impl UpdateStatistics {
         db_rows: &[&Arc<DbRow>],
     ) {
         if self.update_partition_last_read_access_time {
-            crate::db_operations::sync_to_main::update_partition_last_read_time(
-                app,
-                table_name,
-                partition_key,
-            )
-            .await;
+            app.sync_to_main_node_queue
+                .update_partitions_last_read_time(table_name, [partition_key].into_iter())
+                .await;
         }
 
         if self.update_rows_last_read_access_time {
-            crate::db_operations::sync_to_main::update_row_keys_last_read_access_time(
-                app,
-                table_name,
-                &partition_key,
-                db_rows.iter().map(|db_row| &db_row.row_key),
-            )
-            .await;
+            app.sync_to_main_node_queue
+                .update_rows_last_read_time(
+                    table_name,
+                    partition_key,
+                    db_rows.iter().map(|db_row| &db_row.row_key),
+                )
+                .await;
         }
 
         if let Some(update_partition_expiration_time) = self.update_partition_expiration_time {
-            crate::db_operations::sync_to_main::update_partition_expiration_time(
-                app,
-                table_name,
-                partition_key,
-                update_partition_expiration_time,
-            )
-            .await;
+            app.sync_to_main_node_queue
+                .update_partition_expiration_time(
+                    table_name,
+                    partition_key,
+                    update_partition_expiration_time,
+                )
+                .await;
         }
 
         if let Some(update_rows_expiration_time) = self.update_rows_expiration_time {
-            crate::db_operations::sync_to_main::update_rows_expiration_time(
-                app,
-                table_name,
-                partition_key,
-                db_rows.iter().map(|db_row| &db_row.row_key),
-                update_rows_expiration_time,
-            )
-            .await;
+            app.sync_to_main_node_queue
+                .update_rows_expiration_time(
+                    table_name,
+                    partition_key,
+                    db_rows.iter().map(|db_row| &db_row.row_key),
+                    update_rows_expiration_time,
+                )
+                .await;
         }
     }
 }

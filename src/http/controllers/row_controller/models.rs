@@ -1,8 +1,9 @@
 use my_http_server_swagger::*;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::{Deserialize, Serialize};
 
-use crate::db_operations::read::UpdateStatistics;
+use crate::{
+    db_operations::read::UpdateStatistics, http::controllers::mappers::ToSetExpirationTime,
+};
 
 #[derive(MyHttpInput)]
 pub struct RowsCountInputContract {
@@ -62,17 +63,10 @@ impl GetRowInputModel {
         UpdateStatistics {
             update_partition_last_read_access_time: self.update_partition_last_read_access_time,
             update_rows_last_read_access_time: self.update_db_rows_last_read_access_time,
-            update_partition_expiration_time: if let Some(dt) = &self.set_partition_expiration_time
-            {
-                DateTimeAsMicroseconds::from_str(dt)
-            } else {
-                None
-            },
-            update_rows_expiration_time: if let Some(dt) = &self.set_db_rows_expiration_time {
-                DateTimeAsMicroseconds::from_str(dt)
-            } else {
-                None
-            },
+            update_partition_expiration_time: self
+                .set_partition_expiration_time
+                .to_set_expiration_time(),
+            update_rows_expiration_time: self.set_db_rows_expiration_time.to_set_expiration_time(),
         }
     }
 }

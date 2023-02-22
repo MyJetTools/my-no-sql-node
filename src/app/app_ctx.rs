@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use my_no_sql_core::sync_to_main::SyncToMainNodeQueues;
 use my_no_sql_server_core::{logs::*, DbInstance};
 use my_tcp_sockets::TcpClient;
 use rust_extensions::{
@@ -11,14 +12,12 @@ use rust_extensions::{
 };
 
 use crate::{
-    background::sync_to_main_node::SyncToMainNodeEvent,
-    data_readers::DataReadersList,
-    db_operations::{multipart::MultipartList, sync_to_main::SyncToMainNodeQueues},
-    db_sync::SyncEvent,
+    data_readers::DataReadersList, db_operations::multipart::MultipartList, db_sync::SyncEvent,
     settings_reader::SettingsModel,
 };
 
 use super::{connection_to_main_node::ConnectionToMainNode, PrometheusMetrics};
+use crate::tcp_client_to_main_node::DataReaderTcpConnection;
 
 pub const APP_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -42,8 +41,7 @@ pub struct AppContext {
     pub master_node_ping_interval: AtomicI64,
     pub connected_to_main_node: ConnectionToMainNode,
 
-    pub sync_to_main_node_queue: SyncToMainNodeQueues,
-    pub sync_to_main_node_events_loop: EventsLoop<SyncToMainNodeEvent>,
+    pub sync_to_main_node_queue: SyncToMainNodeQueues<DataReaderTcpConnection>,
 }
 
 impl AppContext {
@@ -67,7 +65,6 @@ impl AppContext {
             master_node_ping_interval: AtomicI64::new(0),
             connected_to_main_node: ConnectionToMainNode::new(),
             sync_to_main_node_queue: SyncToMainNodeQueues::new(),
-            sync_to_main_node_events_loop: EventsLoop::new("SyncToMainPusher".to_string()),
         }
     }
 }
