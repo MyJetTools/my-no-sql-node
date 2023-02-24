@@ -1,3 +1,4 @@
+use my_http_server::types::RawDataTyped;
 use my_http_server_swagger::{MyHttpInput, MyHttpObjectStructure};
 use serde::{Deserialize, Serialize};
 
@@ -37,8 +38,8 @@ pub struct GetChangesInputModel {
     #[http_header(name = "session"; description = "Id of session")]
     pub session_id: String,
 
-    #[http_body(description = "Update model")]
-    pub body: Vec<u8>,
+    #[http_body_raw(description = "Update model")]
+    pub body: RawDataTyped<GetChangesBodyModel>,
 }
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]

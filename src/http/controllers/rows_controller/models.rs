@@ -1,3 +1,4 @@
+use my_http_server::types::RawDataTyped;
 use my_http_server_swagger::*;
 use serde::{Deserialize, Serialize};
 
@@ -65,8 +66,8 @@ pub struct GetSinglePartitionMultipleRowsActionInputContract {
     #[http_query(name = "partitionKey"; description = "Partition Key")]
     pub partition_key: String,
 
-    #[http_body(description = "Row keys")]
-    pub body: Vec<u8>,
+    #[http_body_raw(description = "Row keys")]
+    pub body: RawDataTyped<Vec<String>>,
 
     #[http_header(name ="updatePartitionLastReadTime"; description = "Update partition last read time")]
     pub update_partition_last_read_access_time: Option<bool>,

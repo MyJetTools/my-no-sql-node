@@ -9,7 +9,7 @@ use crate::{
     http::{controllers::mappers::ToSetExpirationTime, http_sessions::HttpSessionsSupport},
 };
 
-use super::models::{GetChangesBodyModel, GetChangesInputModel, UpdateExpirationDateTime};
+use super::models::{GetChangesInputModel, UpdateExpirationDateTime};
 
 #[my_http_server_swagger::http_route(
     method: "POST",
@@ -42,15 +42,14 @@ async fn handle_request(
         .get_http_session(input_data.session_id.as_str())
         .await?;
 
-    if let Ok(body) = serde_json::from_slice::<GetChangesBodyModel>(&input_data.body) {
-        for update_model in &body.update_expiration_time {
-            update_expiration_time(
-                action.app.as_ref(),
-                update_model.table_name.as_str(),
-                &update_model.items,
-            )
-            .await?;
-        }
+    let body_data = input_data.body.deserialize_json()?;
+    for update_model in &body_data.update_expiration_time {
+        update_expiration_time(
+            action.app.as_ref(),
+            update_model.table_name.as_str(),
+            &update_model.items,
+        )
+        .await?;
     }
 
     if let DataReaderConnection::Http(info) = &data_reader.connection {
