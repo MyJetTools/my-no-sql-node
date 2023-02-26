@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use my_no_sql_server_core::DbTableWrapper;
-use rust_extensions::{date_time::DateTimeAsMicroseconds, lazy::LazyVec};
+use rust_extensions::lazy::LazyVec;
 
 use crate::{
     app::AppContext,
@@ -20,11 +20,7 @@ pub async fn get_all_by_row_key(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let now = DateTimeAsMicroseconds::now();
-
     let mut db_table = db_table_wrapper.data.write().await;
-
-    db_table.last_read_time.update(now);
 
     let mut db_rows = LazyVec::new();
 

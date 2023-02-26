@@ -14,8 +14,6 @@ pub struct TableModel {
     pub data_size: usize,
     #[serde(rename = "recordsAmount")]
     pub records_amount: usize,
-    #[serde(rename = "lastUpdateTime")]
-    pub last_update_time: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
@@ -60,7 +58,6 @@ impl StatusModel {
                 partitions_count: metrics.partitions_amount,
                 data_size: metrics.table_size,
                 records_amount: metrics.records_amount,
-                last_update_time: metrics.last_update_time.unix_microseconds,
             };
 
             tables_model.push(table_model);

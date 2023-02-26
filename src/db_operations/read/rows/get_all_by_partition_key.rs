@@ -1,5 +1,4 @@
 use my_no_sql_server_core::DbTableWrapper;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use crate::{
     app::AppContext,
@@ -18,11 +17,7 @@ pub async fn get_all_by_partition_key(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let now = DateTimeAsMicroseconds::now();
-
     let mut db_table = db_table_wrapper.data.write().await;
-
-    db_table.last_read_time.update(now);
 
     let get_partition_result = db_table.get_partition_mut(partition_key);
 

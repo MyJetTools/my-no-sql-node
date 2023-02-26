@@ -9,12 +9,23 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo ${GITHUB_REF_NAME})
+
+      - name: Updating version
+        run: sed -i -e 's/^version = .*/version = "${{ steps.get_version.outputs.VERSION }}"/' Cargo.toml
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1      
+              
       - run: cargo build --release
 
       - name: Docker login
@@ -27,5 +38,5 @@ jobs:
         run: |
           ver=$(cat Cargo.toml | grep -m1 version | grep  -Eo '["\047].*["\047]' | tr -d '"')
           echo $ver
-          docker build -t ${IMAGE_NAME}:$ver .
-          docker push ${IMAGE_NAME}:$ver
+          docker build -t ${IMAGE_NAME}:${{ steps.get_version.outputs.VERSION }} .
+          docker push ${IMAGE_NAME}:${{ steps.get_version.outputs.VERSION }}

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use my_no_sql_server_core::DbTableWrapper;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use crate::{
     app::AppContext,
@@ -19,11 +18,7 @@ pub async fn get_all(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let now = DateTimeAsMicroseconds::now();
-
     let table_data = db_table_wrapper.data.read().await;
-
-    table_data.last_read_time.update(now);
 
     let result_items = table_data.get_all_rows();
 
