@@ -21,7 +21,7 @@ pub async fn delete_rows(
 
     for db_row in rows {
         let removed_row =
-            table_data.remove_row(db_row.partition_key.as_str(), db_row.row_key.as_str(), true);
+            table_data.remove_row(&db_row.partition_key, db_row.row_key.as_str(), true);
 
         if let Some(deleted_row) = removed_row {
             sync_data.add_deleted_row(db_row.partition_key.as_str(), deleted_row.0);

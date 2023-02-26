@@ -20,9 +20,9 @@ pub async fn sync_partition(
 
     let mut table_data = db_table.data.write().await;
 
-    table_data.remove_partition(partition_key.as_str());
+    table_data.remove_partition(&partition_key);
 
-    table_data.bulk_insert_or_replace(partition_key.as_str(), &entities);
+    table_data.bulk_insert_or_replace(&partition_key, &entities);
 
     let sync_data = InitPartitionsSyncData::new_as_update_partition(
         &table_data,

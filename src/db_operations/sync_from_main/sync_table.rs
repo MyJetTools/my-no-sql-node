@@ -18,10 +18,10 @@ pub async fn sync_table(
 
     let mut db_table = db_table_wrapper.data.write().await;
 
-    db_table.clean_table();
+    db_table.clear_table();
 
     for (partition_key, db_rows) in entities {
-        db_table.bulk_insert_or_replace(partition_key.as_str(), &db_rows);
+        db_table.bulk_insert_or_replace(&partition_key, &db_rows);
     }
 
     let sync_data = InitTableEventSyncData::new(db_table_wrapper.clone(), event_src);

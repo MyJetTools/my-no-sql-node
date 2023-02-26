@@ -28,7 +28,7 @@ pub async fn get_all_by_row_key(
 
     let mut db_rows = LazyVec::new();
 
-    for partition in db_table.partitions.values_mut() {
+    for partition in db_table.partitions.get_partitions_mut() {
         let get_row_result = partition.get_row(row_key);
 
         if let Some(db_row) = get_row_result {

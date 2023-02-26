@@ -21,7 +21,7 @@ pub async fn sync_rows(
     let mut sync_data = UpdateRowsSyncData::new(&table_data, event_src);
 
     for (partition_key, db_rows) in entities {
-        table_data.bulk_insert_or_replace(partition_key.as_str(), &db_rows);
+        table_data.bulk_insert_or_replace(&partition_key, &db_rows);
 
         sync_data
             .rows_by_partition
