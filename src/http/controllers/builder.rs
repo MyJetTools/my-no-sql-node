@@ -52,10 +52,6 @@ pub fn build(app: &Arc<AppContext>) -> ControllersMiddleware {
         super::rows_controller::GetHighestRowAndBelowAction::new(app.clone()),
     ));
 
-    result.register_get_action(Arc::new(
-        super::rows_controller::GetHighestRowAndBelowAction::new(app.clone()),
-    ));
-
     result.register_post_action(Arc::new(
         super::rows_controller::GetSinglePartitionMultipleRowsAction::new(app.clone()),
     ));
