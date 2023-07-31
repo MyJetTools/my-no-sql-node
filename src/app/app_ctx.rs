@@ -5,7 +5,7 @@ use std::{
 };
 
 use my_no_sql_server_core::{logs::*, DbInstance};
-use my_no_sql_tcp_shared::sync_to_main::SyncToMainNodelHandler;
+use my_no_sql_tcp_shared::sync_to_main::SyncToMainNodeHandler;
 use my_tcp_sockets::TcpClient;
 use rust_extensions::{
     date_time::DateTimeAsMicroseconds, events_loop::EventsLoop, AppStates, Logger,
@@ -40,7 +40,7 @@ pub struct AppContext {
     pub master_node_ping_interval: AtomicI64,
     pub connected_to_main_node: ConnectionToMainNode,
 
-    pub sync_to_main_node: SyncToMainNodelHandler,
+    pub sync_to_main_node: SyncToMainNodeHandler,
 }
 
 impl AppContext {
@@ -63,7 +63,7 @@ impl AppContext {
             node_connection_tcp_client,
             master_node_ping_interval: AtomicI64::new(0),
             connected_to_main_node: ConnectionToMainNode::new(),
-            sync_to_main_node: SyncToMainNodelHandler::new(),
+            sync_to_main_node: SyncToMainNodeHandler::new(),
         }
     }
 }

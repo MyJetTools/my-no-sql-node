@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use my_json::json_writer::JsonObjectWriter;
+use my_json::json_writer::{JsonNullValue, JsonObjectWriter};
 use my_no_sql_core::db::DbTable;
 use my_no_sql_server_core::db_snapshots::DbPartitionSnapshot;
 
@@ -44,7 +44,7 @@ impl InitPartitionsSyncData {
                     db_partition_snapshot.db_rows_snapshot.as_json_array(),
                 );
             } else {
-                json_object_writer.write_empty_array(partition_key)
+                json_object_writer.write_value(partition_key, JsonNullValue);
             }
         }
 

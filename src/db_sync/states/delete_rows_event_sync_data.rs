@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use my_json::json_writer::{JsonArrayWriter, JsonObjectWriter};
+use my_json::json_writer::{JsonArrayWriter, JsonNullValue, JsonObjectWriter};
 use my_no_sql_core::db::{DbRow, DbTable};
 
 use crate::db_sync::EventSource;
@@ -58,7 +58,7 @@ impl DeleteRowsEventSyncData {
         {
             if let Some(deleted_partitions) = &self.deleted_partitions {
                 for partition_key in deleted_partitions.keys() {
-                    json_object_writer.write_null_value(partition_key);
+                    json_object_writer.write_value(partition_key, JsonNullValue);
                 }
             }
 

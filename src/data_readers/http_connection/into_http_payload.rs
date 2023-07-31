@@ -25,7 +25,7 @@ fn write_init_table_result(table_name: &str, content: JsonArrayWriter) -> Vec<u8
     let mut result = Vec::new();
 
     let mut header_json = JsonObjectWriter::new();
-    header_json.write_string_value("tableName", table_name);
+    header_json.write_value("tableName", table_name);
 
     let header = format!(
         "initTable:{}",
@@ -43,7 +43,7 @@ fn write_init_partitions_result(sync_data: &InitPartitionsSyncData) -> Vec<u8> {
     let mut result = Vec::new();
 
     let mut header_json = JsonObjectWriter::new();
-    header_json.write_string_value("tableName", sync_data.table_name.as_str());
+    header_json.write_value("tableName", sync_data.table_name.as_str());
 
     let header = format!(
         "initPartitions:{}",
@@ -60,7 +60,7 @@ fn write_init_partitions_result(sync_data: &InitPartitionsSyncData) -> Vec<u8> {
 pub fn compile_update_rows_result(sync_data: &UpdateRowsSyncData) -> Vec<u8> {
     let mut result = Vec::new();
     let mut header_json = JsonObjectWriter::new();
-    header_json.write_string_value("tableName", sync_data.table_name.as_str());
+    header_json.write_value("tableName", sync_data.table_name.as_str());
 
     let header = format!(
         "updateRows:{}",
@@ -78,7 +78,7 @@ pub fn compile_delete_rows_result(sync_data: &DeleteRowsEventSyncData) -> Vec<u8
     let mut result = Vec::new();
     let mut header_json = JsonObjectWriter::new();
 
-    header_json.write_string_value("tableName", sync_data.table_name.as_str());
+    header_json.write_value("tableName", sync_data.table_name.as_str());
 
     let header = format!(
         "deleteRows:{}",
