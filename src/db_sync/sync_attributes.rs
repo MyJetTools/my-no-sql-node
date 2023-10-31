@@ -1,4 +1,4 @@
-use my_http_server_swagger::*;
+use my_http_server::macros::*;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, MyHttpStringEnum)]

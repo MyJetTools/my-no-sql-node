@@ -4,8 +4,8 @@ use background::{
     metrics_updater::MetricsUpdater, sync_to_client::SyncToClientEventLoop,
 };
 
+use my_no_sql_sdk::tcp_contracts::MyNoSqlReaderTcpSerializer;
 use my_no_sql_server_core::logs::Logs;
-use my_no_sql_tcp_shared::MyNoSqlReaderTcpSerializer;
 use my_tcp_sockets::TcpServer;
 use rust_extensions::MyTimer;
 use std::{net::SocketAddr, sync::Arc, time::Duration};

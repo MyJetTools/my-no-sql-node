@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use my_json::json_writer::{JsonArrayWriter, JsonNullValue, JsonObjectWriter};
-use my_no_sql_core::db::{DbRow, DbTable};
+use my_no_sql_sdk::core::db::{DbRow, DbTable};
 
 use crate::db_sync::EventSource;
 

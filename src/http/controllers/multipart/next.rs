@@ -1,3 +1,4 @@
+use my_http_server::macros::*;
 use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult};
@@ -6,7 +7,7 @@ use crate::{app::AppContext, http::controllers::row_controller::models::BaseDbRo
 
 use super::models::NextMultipartRequestInputContract;
 
-#[my_http_server_swagger::http_route(
+#[http_route(
     method: "POST",
     route: "/Multipart/Next",
     controller: "Multipart",

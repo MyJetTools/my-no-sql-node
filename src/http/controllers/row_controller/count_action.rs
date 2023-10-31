@@ -1,12 +1,12 @@
-use std::sync::Arc;
-
+use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
+use std::sync::Arc;
 
 use crate::app::AppContext;
 
 use super::models::RowsCountInputContract;
 
-#[my_http_server_swagger::http_route(
+#[http_route(
     method: "GET",
     route: "/Count",
     controller: "Row",

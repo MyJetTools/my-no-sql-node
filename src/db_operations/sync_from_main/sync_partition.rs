@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_no_sql_core::db_json_entity::DbJsonEntity;
+use my_no_sql_sdk::core::db_json_entity::DbJsonEntity;
 
 use crate::{
     app::AppContext,

@@ -1,4 +1,4 @@
-use my_no_sql_tcp_shared::{DeleteRowTcpContract, MyNoSqlTcpContract};
+use my_no_sql_sdk::tcp_contracts::{DeleteRowTcpContract, MyNoSqlTcpContract};
 
 use crate::db_sync::SyncEvent;
 use my_json::json_reader::consts::EMPTY_ARRAY;

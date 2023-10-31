@@ -1,3 +1,4 @@
+use my_http_server::macros::*;
 use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
@@ -11,7 +12,7 @@ use crate::{
 
 use super::models::{GetChangesInputModel, UpdateExpirationDateTime};
 
-#[my_http_server_swagger::http_route(
+#[http_route(
     method: "POST",
     route: "/DataReader/GetChanges",
     controller: "DataReader",

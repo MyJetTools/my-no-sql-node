@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
-use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
+use my_no_sql_sdk::tcp_contracts::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
 
 use crate::{app::AppContext, db_sync::EventSource};

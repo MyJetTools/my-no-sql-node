@@ -1,4 +1,4 @@
-use my_no_sql_core::db_json_entity::DbEntityParseFail;
+use my_no_sql_sdk::core::db_json_entity::DbEntityParseFail;
 
 #[derive(Debug)]
 pub enum DbOperationError {

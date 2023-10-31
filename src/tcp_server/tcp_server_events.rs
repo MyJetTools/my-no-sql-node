@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use my_no_sql_sdk::tcp_contracts::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_no_sql_server_core::logs::*;
-use my_no_sql_tcp_shared::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
 use my_tcp_sockets::{tcp_connection::SocketConnection, ConnectionEvent, SocketEventCallback};
 
 use crate::app::AppContext;

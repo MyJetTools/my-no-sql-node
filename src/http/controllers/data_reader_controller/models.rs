@@ -1,5 +1,5 @@
+use my_http_server::macros::*;
 use my_http_server::types::RawDataTyped;
-use my_http_server_swagger::{MyHttpInput, MyHttpObjectStructure};
 use serde::{Deserialize, Serialize};
 
 use crate::http::controllers::row_controller::models::BaseDbRowContract;

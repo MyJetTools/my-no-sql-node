@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_no_sql_tcp_shared::MyNoSqlTcpContract;
+use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpContract;
 
 use crate::{
     app::AppContext,

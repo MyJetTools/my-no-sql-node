@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use my_no_sql_core::{db::DbRow, db_json_entity::DbJsonEntity};
+use my_no_sql_sdk::core::{db::DbRow, db_json_entity::DbJsonEntity};
 
 use super::DbOperationError;
 

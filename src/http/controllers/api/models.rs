@@ -1,4 +1,4 @@
-use my_http_server_swagger::*;
+use my_http_server::macros::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]

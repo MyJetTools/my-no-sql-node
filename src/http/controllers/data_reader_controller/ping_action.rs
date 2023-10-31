@@ -1,12 +1,12 @@
-use std::sync::Arc;
-
+use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
+use std::sync::Arc;
 
 use crate::{app::AppContext, http::http_sessions::HttpSessionsSupport};
 
 use super::models::PingInputModel;
 
-#[my_http_server_swagger::http_route(
+#[http_route(
     method: "POST",
     route: "/DataReader/Ping",
     controller: "DataReader",

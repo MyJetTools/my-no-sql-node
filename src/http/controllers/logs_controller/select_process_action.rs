@@ -1,8 +1,8 @@
+use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult};
-
 use my_no_sql_server_core::logs::*;
 
-#[my_http_server_swagger::http_route(
+#[http_route(
     method: "GET",
     route: "/Logs/Process",
 

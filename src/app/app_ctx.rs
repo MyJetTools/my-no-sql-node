@@ -4,8 +4,8 @@ use std::{
     time::Duration,
 };
 
+use my_no_sql_sdk::tcp_contracts::sync_to_main::SyncToMainNodeHandler;
 use my_no_sql_server_core::{logs::*, DbInstance};
-use my_no_sql_tcp_shared::sync_to_main::SyncToMainNodeHandler;
 use my_tcp_sockets::TcpClient;
 use rust_extensions::{
     date_time::DateTimeAsMicroseconds, events_loop::EventsLoop, AppStates, Logger,

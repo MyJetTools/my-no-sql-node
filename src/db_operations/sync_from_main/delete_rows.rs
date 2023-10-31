@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_no_sql_tcp_shared::DeleteRowTcpContract;
+use my_no_sql_sdk::tcp_contracts::DeleteRowTcpContract;
 
 use crate::{
     app::AppContext,
