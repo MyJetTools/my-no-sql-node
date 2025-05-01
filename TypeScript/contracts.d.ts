@@ -53,5 +53,5 @@ interface ITableModel {
     partitionsCount: number;
     dataSize: number;
     recordsAmount: number;
-    lastUpdateTime: number;
+
 }
