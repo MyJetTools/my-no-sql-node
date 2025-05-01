@@ -29,6 +29,7 @@ async fn handle_request(
         headers: None,
         content_type: None,
         content: result.into_bytes(),
+        set_cookies: None,
     }
     .into_ok_result(true)
     .into()

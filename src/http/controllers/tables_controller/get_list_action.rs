@@ -13,7 +13,7 @@ use super::models::TableContract;
     summary: "Returns List of Tables",
     controller: "Tables",
     result:[
-        {status_code: 200, description: "List of tables", model_as_array: "TableContract"},
+        {status_code: 200, description: "List of tables", model: "Vec<TableContract>"},
     ]
 )]
 pub struct GetListAction {

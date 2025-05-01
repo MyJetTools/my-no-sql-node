@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use my_no_sql_sdk::{
+    core::db::DbTableName, server::rust_extensions::date_time::DateTimeAsMicroseconds,
+};
 
 use super::{DataReader, DataReaderConnection};
 
@@ -111,11 +113,14 @@ impl DataReadersData {
         None
     }
 
-    pub async fn get_subscribred_to_table(&self, table_name: &str) -> Option<Vec<Arc<DataReader>>> {
+    pub async fn get_subscribred_to_table(
+        &self,
+        table_name: &DbTableName,
+    ) -> Option<Vec<Arc<DataReader>>> {
         let mut result = None;
 
         for data_reader in self.all.values() {
-            if data_reader.has_table(table_name).await {
+            if data_reader.has_table(table_name.as_str()).await {
                 if result.is_none() {
                     result = Some(Vec::new());
                 }

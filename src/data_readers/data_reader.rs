@@ -6,11 +6,9 @@ use std::{
     },
 };
 
+use my_no_sql_sdk::server::{rust_extensions::date_time::DateTimeAsMicroseconds, DbTable};
 use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpContract;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio::sync::{Mutex, RwLock};
-
-use my_no_sql_server_core::DbTableWrapper;
 
 use super::{DataReaderConnection, DataReaderUpdatableData};
 
@@ -76,7 +74,7 @@ impl DataReader {
         self.connection.get_name().await
     }
 
-    pub async fn subscribe(&self, db_table: Arc<DbTableWrapper>) {
+    pub async fn subscribe(&self, db_table: Arc<DbTable>) {
         let mut write_access = self.data.write().await;
         write_access.subscribe(db_table);
     }
@@ -84,7 +82,7 @@ impl DataReader {
     pub async fn send_error_to_client(&self, message: String) {
         if let DataReaderConnection::Tcp(tcp) = &self.connection {
             let error = MyNoSqlTcpContract::Error { message };
-            tcp.send(error.serialize().as_slice()).await;
+            tcp.send(&error).await;
         }
     }
 
@@ -97,7 +95,7 @@ impl DataReader {
 
     fn get_connected_moment(&self) -> DateTimeAsMicroseconds {
         match &self.connection {
-            DataReaderConnection::Tcp(connection) => connection.connection.statistics.connected,
+            DataReaderConnection::Tcp(connection) => connection.connection.statistics().connected,
             DataReaderConnection::Http(connection) => connection.connected,
         }
     }
@@ -106,7 +104,7 @@ impl DataReader {
         match &self.connection {
             DataReaderConnection::Tcp(connection) => connection
                 .connection
-                .statistics
+                .statistics()
                 .last_receive_moment
                 .as_date_time(),
             DataReaderConnection::Http(connection) => {

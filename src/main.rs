@@ -1,13 +1,9 @@
 use app::AppContext;
-use background::{
-    gc_http_sessions::GcHttpSessionsTimer, gc_multipart::GcMultipart,
-    metrics_updater::MetricsUpdater, sync_to_client::SyncToClientEventLoop,
-};
+use background::*;
 
-use my_no_sql_sdk::tcp_contracts::MyNoSqlReaderTcpSerializer;
-use my_no_sql_server_core::logs::Logs;
+use my_no_sql_sdk::server::rust_extensions::MyTimer;
+use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpSerializerFactory;
 use my_tcp_sockets::TcpServer;
-use rust_extensions::MyTimer;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tcp_client_to_main_node::TcpClientSocketCallback;
 use tcp_server::TcpServerEvents;
@@ -33,15 +29,9 @@ async fn main() {
 
     let settings = Arc::new(settings);
 
-    let logs = Arc::new(Logs::new());
-
-    let app = AppContext::new(logs.clone(), settings);
+    let app = AppContext::new(settings);
 
     let app = Arc::new(app);
-
-    app.sync_to_client_events_loop
-        .register_event_loop(Arc::new(SyncToClientEventLoop::new(app.clone())))
-        .await;
 
     let mut timer_1s = MyTimer::new(Duration::from_secs(1));
 
@@ -53,21 +43,18 @@ async fn main() {
         Arc::new(GcHttpSessionsTimer::new(app.clone())),
     );
 
-    let mut timer_30s = MyTimer::new(Duration::from_secs(30));
-
-    timer_30s.register_timer("GcMultipart", Arc::new(GcMultipart::new(app.clone())));
-
-    timer_1s.start(app.states.clone(), app.clone());
-    timer_10s.start(app.states.clone(), app.clone());
-    timer_30s.start(app.states.clone(), app.clone());
+    timer_1s.start(app.states.clone(), my_logger::LOGGER.clone());
+    timer_10s.start(app.states.clone(), my_logger::LOGGER.clone());
 
     app.sync_to_client_events_loop
-        .start(app.states.clone(), app.clone())
+        .register_event_loop(Arc::new(SyncEventsToClients::new(app.clone())))
         .await;
 
-    app.sync_to_main_node
-        .start(app.states.clone(), app.clone())
+    app.sync_to_client_events_loop
+        .start(app.states.clone(), my_logger::LOGGER.clone())
         .await;
+
+    app.sync_to_main_node.start(app.states.clone()).await;
 
     crate::http::start_up::setup_server(&app);
 
@@ -78,10 +65,10 @@ async fn main() {
 
     tcp_server
         .start(
-            Arc::new(MyNoSqlReaderTcpSerializer::new),
+            Arc::new(MyNoSqlTcpSerializerFactory),
             Arc::new(TcpServerEvents::new(app.clone())),
             app.states.clone(),
-            app.clone(),
+            my_logger::LOGGER.clone(),
         )
         .await;
 
@@ -91,9 +78,9 @@ async fn main() {
 
     app.node_connection_tcp_client
         .start(
-            Arc::new(|| -> MyNoSqlReaderTcpSerializer { MyNoSqlReaderTcpSerializer::new() }),
+            Arc::new(MyNoSqlTcpSerializerFactory),
             socket_callback,
-            app.clone(),
+            my_logger::LOGGER.clone(),
         )
         .await;
 

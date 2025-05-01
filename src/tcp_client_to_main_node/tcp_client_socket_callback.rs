@@ -3,15 +3,11 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
+use my_logger::LogEventCtx;
 use my_no_sql_sdk::tcp_contracts::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
-use my_tcp_sockets::{ConnectionEvent, SocketEventCallback};
+use my_tcp_sockets::{tcp_connection::TcpSocketConnection, SocketEventCallback};
 
-use crate::{app::AppContext, db_sync::EventSource};
-
-pub type DataReaderTcpConnection = my_tcp_sockets::tcp_connection::SocketConnection<
-    MyNoSqlTcpContract,
-    MyNoSqlReaderTcpSerializer,
->;
+use crate::{app::AppContext, tcp_server::MyNoSqlTcpConnection};
 
 pub struct TcpClientSocketCallback {
     app: Arc<AppContext>,
@@ -21,15 +17,58 @@ impl TcpClientSocketCallback {
     pub fn new(app: Arc<AppContext>) -> Self {
         Self { app }
     }
+}
 
-    pub async fn handle_incoming_packet(
+#[async_trait::async_trait]
+impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
+    for TcpClientSocketCallback
+{
+    async fn connected(
         &self,
-        tcp_contract: MyNoSqlTcpContract,
-        connection: Arc<DataReaderTcpConnection>,
+        connection: Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
     ) {
-        match tcp_contract {
+        let contract = MyNoSqlTcpContract::GreetingFromNode {
+            node_location: self.app.settings.location.to_string(),
+            node_version: crate::app::APP_VERSION.to_string(),
+            compress: self.app.settings.compress,
+        };
+
+        connection.send(&contract).await;
+
+        let tables = self.app.db.get_tables().await;
+
+        for table in tables {
+            let contract = MyNoSqlTcpContract::SubscribeAsNode(table.name.to_string());
+            connection.send(&contract).await;
+        }
+
+        self.app
+            .connected_to_main_node
+            .connected(connection.clone())
+            .await;
+
+        self.app
+            .sync_to_main_node
+            .tcp_events_pusher_new_connection_established(connection);
+    }
+
+    async fn disconnected(&self, connection: Arc<MyNoSqlTcpConnection>) {
+        self.app.connected_to_main_node.disconnected().await;
+
+        self.app
+            .sync_to_main_node
+            .tcp_events_pusher_connection_disconnected(connection);
+    }
+
+    async fn payload(&self, connection: &Arc<MyNoSqlTcpConnection>, contract: MyNoSqlTcpContract) {
+        if let MyNoSqlTcpContract::CompressedPayload(data) = &contract {
+            println!("CompressedPayload: {}", data.len());
+        }
+        let contract = contract.decompress_if_compressed().await.unwrap();
+
+        match contract {
             MyNoSqlTcpContract::Pong => {
-                if let Some(duration) = connection.statistics.get_ping_pong_duration() {
+                if let Some(duration) = connection.statistics().get_ping_pong_duration() {
                     let microseconds = duration.as_micros();
                     self.app
                         .master_node_ping_interval
@@ -37,13 +76,7 @@ impl TcpClientSocketCallback {
                 }
             }
             MyNoSqlTcpContract::InitTable { table_name, data } => {
-                crate::db_operations::sync_from_main::sync_table(
-                    &self.app,
-                    table_name,
-                    data,
-                    EventSource::SyncFromMain,
-                )
-                .await;
+                crate::db_operations::sync_from_main::sync_table(&self.app, table_name, data).await;
             }
             MyNoSqlTcpContract::InitPartition {
                 table_name,
@@ -55,37 +88,24 @@ impl TcpClientSocketCallback {
                     table_name,
                     partition_key,
                     data,
-                    EventSource::SyncFromMain,
                 )
                 .await;
             }
             MyNoSqlTcpContract::UpdateRows { table_name, data } => {
-                crate::db_operations::sync_from_main::sync_rows(
-                    &self.app,
-                    table_name,
-                    data,
-                    EventSource::SyncFromMain,
-                )
-                .await;
+                crate::db_operations::sync_from_main::sync_rows(&self.app, table_name, data).await;
             }
             MyNoSqlTcpContract::DeleteRows { table_name, rows } => {
-                crate::db_operations::sync_from_main::delete_rows(
-                    &self.app,
-                    table_name,
-                    rows,
-                    EventSource::SyncFromMain,
-                )
-                .await;
+                crate::db_operations::sync_from_main::delete_rows(&self.app, table_name, rows)
+                    .await;
             }
             MyNoSqlTcpContract::Error { message } => {
                 let mut ctx = HashMap::new();
                 ctx.insert("connection_id".to_string(), connection.id.to_string());
-                self.app.logs.add_error(
-                    None,
-                    my_no_sql_server_core::logs::SystemProcess::TcpSocket,
-                    "TcoClientError".to_string(),
+
+                my_logger::LOGGER.write_error(
+                    "TcpPayload",
                     message,
-                    Some(ctx),
+                    LogEventCtx::new().add("ConnectionId", connection.id.to_string()),
                 );
             }
             MyNoSqlTcpContract::TableNotFound(table_name) => {
@@ -107,62 +127,6 @@ impl TcpClientSocketCallback {
             }
 
             _ => {}
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer>
-    for TcpClientSocketCallback
-{
-    async fn handle(
-        &self,
-        connection_event: ConnectionEvent<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer>,
-    ) {
-        match connection_event {
-            ConnectionEvent::Connected(connection) => {
-                let contract = MyNoSqlTcpContract::GreetingFromNode {
-                    node_location: self.app.settings.location.to_string(),
-                    node_version: crate::app::APP_VERSION.to_string(),
-                    compress: self.app.settings.compress,
-                };
-
-                connection.send(contract).await;
-
-                let tables = self.app.db.get_tables().await;
-
-                for table in tables {
-                    let contract = MyNoSqlTcpContract::SubscribeAsNode(table.name.to_string());
-                    connection.send(contract).await;
-                }
-
-                self.app
-                    .connected_to_main_node
-                    .connected(connection.clone())
-                    .await;
-
-                self.app
-                    .sync_to_main_node
-                    .tcp_events_pusher_new_connection_established(connection);
-            }
-            ConnectionEvent::Disconnected(connection) => {
-                self.app.connected_to_main_node.disconnected().await;
-
-                self.app
-                    .sync_to_main_node
-                    .tcp_events_pusher_connection_disconnected(connection);
-            }
-            ConnectionEvent::Payload {
-                connection,
-                payload,
-            } => {
-                if let MyNoSqlTcpContract::CompressedPayload(data) = &payload {
-                    println!("CompressedPayload: {}", data.len());
-                }
-                let payload = payload.decompress_if_compressed().await.unwrap();
-
-                self.handle_incoming_packet(payload, connection).await;
-            }
         }
     }
 }

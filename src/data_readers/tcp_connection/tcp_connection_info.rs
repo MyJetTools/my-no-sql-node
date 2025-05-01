@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpContract;
 use tokio::sync::Mutex;
 
 use crate::tcp_server::MyNoSqlTcpConnection;
@@ -53,10 +54,10 @@ impl TcpConnectionInfo {
         *write_access = Some(name);
     }
 
-    pub async fn send(&self, payload_to_send: &[u8]) {
+    pub async fn send(&self, contract: &MyNoSqlTcpContract) {
+        let size = self.connection.send(contract).await;
         self.sent_per_second_accumulator
-            .fetch_add(payload_to_send.len(), std::sync::atomic::Ordering::SeqCst);
-        self.connection.send_bytes(payload_to_send).await;
+            .fetch_add(size, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub async fn timer_1sec_tick(&self) {
@@ -68,7 +69,7 @@ impl TcpConnectionInfo {
 
     pub fn get_pending_to_send(&self) -> usize {
         self.connection
-            .statistics
+            .statistics()
             .pending_to_send_buffer_size
             .load(std::sync::atomic::Ordering::Relaxed)
     }

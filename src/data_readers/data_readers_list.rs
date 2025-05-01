@@ -1,6 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use my_no_sql_sdk::{
+    core::db::DbTableName, server::rust_extensions::date_time::DateTimeAsMicroseconds,
+};
 use tokio::sync::RwLock;
 
 use crate::tcp_server::MyNoSqlTcpConnection;
@@ -77,7 +79,10 @@ impl DataReadersList {
         read_lock.get_all()
     }
 
-    pub async fn get_subscribed_to_table(&self, table_name: &str) -> Option<Vec<Arc<DataReader>>> {
+    pub async fn get_subscribed_to_table(
+        &self,
+        table_name: &DbTableName,
+    ) -> Option<Vec<Arc<DataReader>>> {
         let read_access = self.data.read().await;
         read_access.get_subscribred_to_table(table_name).await
     }

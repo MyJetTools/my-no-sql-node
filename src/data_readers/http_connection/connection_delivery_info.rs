@@ -1,7 +1,9 @@
 use std::{collections::VecDeque, time::Duration};
 
 use my_http_server::HttpFailResult;
-use rust_extensions::{date_time::DateTimeAsMicroseconds, TaskCompletion, TaskCompletionAwaiter};
+use my_no_sql_sdk::server::rust_extensions::{
+    date_time::DateTimeAsMicroseconds, TaskCompletion, TaskCompletionAwaiter,
+};
 
 pub enum HttpPayload {
     Ping,

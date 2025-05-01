@@ -12,7 +12,7 @@ use super::models::StatusModel;
     description: "Monitoring API",
     summary: "Returns monitoring metrics",
     result:[
-        {status_code: 200, description: "Monitoring snapshot", model_as_array: "StatusModel"},
+        {status_code: 200, description: "Monitoring snapshot", model: "Vec<StatusModel>"},
     ]
 )]
 pub struct StatusController {

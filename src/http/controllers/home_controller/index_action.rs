@@ -36,6 +36,7 @@ async fn handle_request(
         headers: None,
         content_type: Some(WebContentType::Html),
         content: content.into_bytes(),
+        set_cookies: None,
     }
     .into_ok_result(true)
     .into()

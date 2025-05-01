@@ -1,6 +1,6 @@
 use crate::app::AppContext;
 use my_http_server::macros::*;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use my_no_sql_sdk::server::rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::{Deserialize, Serialize};
 
 use super::status_bar_model::StatusBarModel;
@@ -54,7 +54,7 @@ impl StatusModel {
             let metrics = crate::operations::get_table_metrics(table.as_ref()).await;
 
             let table_model = TableModel {
-                name: table.name.clone(),
+                name: table.name.to_string(),
                 partitions_count: metrics.partitions_amount,
                 data_size: metrics.table_size,
                 records_amount: metrics.records_amount,

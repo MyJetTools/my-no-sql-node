@@ -1,20 +1,19 @@
 use std::sync::Arc;
 
-use my_no_sql_sdk::core::db::DbTable;
-use my_no_sql_server_core::DbTableWrapper;
+use my_no_sql_sdk::{core::db::DbTableInner, server::DbTable};
 
 use crate::app::AppContext;
 
-pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<DbTableWrapper> {
+pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<DbTable> {
     let db_table = app.db.get_table(table_name).await;
 
     if db_table.is_some() {
         return db_table.unwrap();
     }
 
-    let db_table = DbTable::new(table_name.to_string());
+    let inner = DbTableInner::new(table_name.to_string().into());
 
-    let db_table_wrapper = DbTableWrapper::new(db_table);
+    let db_table_wrapper = DbTable::new(inner);
 
     {
         println!("Lazy initializing table: {}", table_name);

@@ -1,9 +1,9 @@
 use my_http_server::macros::*;
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    db_operations::read::UpdateStatistics, http::controllers::mappers::ToSetExpirationTime,
+use my_no_sql_sdk::{
+    core::rust_extensions::date_time::DateTimeAsMicroseconds,
+    tcp_contracts::sync_to_main::UpdateEntityStatisticsData,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(MyHttpInput)]
 pub struct RowsCountInputContract {
@@ -59,26 +59,32 @@ pub struct GetRowInputModel {
 }
 
 impl GetRowInputModel {
-    pub fn get_update_statistics(&self) -> UpdateStatistics {
-        UpdateStatistics {
-            update_partition_last_read_access_time: if let Some(value) =
+    pub fn get_partition_expiration_time(&self) -> Option<Option<DateTimeAsMicroseconds>> {
+        let result = self.set_partition_expiration_time.as_ref()?;
+        Some(DateTimeAsMicroseconds::from_str(result))
+    }
+
+    pub fn get_row_expiration_time(&self) -> Option<Option<DateTimeAsMicroseconds>> {
+        let result = self.set_db_rows_expiration_time.as_ref()?;
+        Some(DateTimeAsMicroseconds::from_str(result))
+    }
+
+    pub fn get_update_statistics(&self) -> UpdateEntityStatisticsData {
+        UpdateEntityStatisticsData {
+            partition_last_read_moment: if let Some(value) =
                 self.update_partition_last_read_access_time
             {
                 value
             } else {
                 false
             },
-            update_rows_last_read_access_time: if let Some(value) =
-                self.update_db_rows_last_read_access_time
-            {
+            row_last_read_moment: if let Some(value) = self.update_db_rows_last_read_access_time {
                 value
             } else {
                 false
             },
-            update_partition_expiration_time: self
-                .set_partition_expiration_time
-                .to_set_expiration_time(),
-            update_rows_expiration_time: self.set_db_rows_expiration_time.to_set_expiration_time(),
+            partition_expiration_moment: self.get_partition_expiration_time(),
+            row_expiration_moment: self.get_row_expiration_time(),
         }
     }
 }

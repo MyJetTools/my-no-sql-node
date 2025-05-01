@@ -2,7 +2,6 @@ use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
 use std::sync::Arc;
 
-use my_no_sql_server_core::logs::*;
 use rust_extensions::StopWatch;
 
 use crate::app::AppContext;

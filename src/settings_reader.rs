@@ -1,4 +1,4 @@
-use my_tcp_sockets::TcpClientSocketSettings;
+use my_tcp_sockets::{TcpClientSocketSettings, TlsSettings};
 use serde::{Deserialize, Serialize};
 use std::env;
 use tokio::{fs::File, io::AsyncReadExt};
@@ -15,8 +15,12 @@ pub struct SettingsModel {
 
 #[async_trait::async_trait]
 impl TcpClientSocketSettings for SettingsModel {
-    async fn get_host_port(&self) -> String {
-        self.main_server.to_string()
+    async fn get_host_port(&self) -> Option<String> {
+        self.main_server.to_string().into()
+    }
+
+    async fn get_tls_settings(&self) -> Option<TlsSettings> {
+        None
     }
 }
 

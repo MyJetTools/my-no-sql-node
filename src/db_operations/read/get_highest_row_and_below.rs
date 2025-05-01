@@ -1,24 +1,25 @@
 use std::sync::Arc;
 
-use my_no_sql_server_core::DbTableWrapper;
+use my_json::json_writer::JsonArrayWriter;
+use my_no_sql_sdk::{server::DbTable, tcp_contracts::sync_to_main::UpdateEntityStatisticsData};
 
 use crate::{app::AppContext, db_operations::DbOperationError};
 
-use super::{read_operation_result::UpdateStatistics, ReadOperationResult};
+use super::ReadOperationResult;
 
 pub async fn get_highest_row_and_below(
     app: &Arc<AppContext>,
-    db_table_wrapper: &DbTableWrapper,
+    db_table: &DbTable,
     partition_key: &String,
     row_key: &String,
     limit: Option<usize>,
-    update_statistics: UpdateStatistics,
+    update_statistics: UpdateEntityStatisticsData,
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::check_app_states(app)?;
 
-    let read_access = db_table_wrapper.data.read().await;
+    let table_inner = db_table.data.read().await;
 
-    let db_partition = read_access.get_partition(partition_key);
+    let db_partition = table_inner.get_partition(partition_key);
 
     if db_partition.is_none() {
         return Ok(ReadOperationResult::EmptyArray);
@@ -26,14 +27,42 @@ pub async fn get_highest_row_and_below(
 
     let db_partition = db_partition.unwrap();
 
-    let db_rows = db_partition.get_highest_row_and_below(row_key, limit);
+    let mut json_array_writer = JsonArrayWriter::new();
+    let mut count = 0;
 
-    return Ok(ReadOperationResult::compile_array_or_empty_from_partition(
-        app,
-        db_table_wrapper.name.as_str(),
-        partition_key,
-        db_rows,
-        update_statistics,
-    )
-    .await);
+    let has_statistics_to_update = update_statistics.has_data_to_update();
+
+    let mut db_rows = Vec::new();
+    for db_row in db_partition.get_highest_row_and_below(row_key) {
+        if let Some(limit) = limit {
+            if count >= limit {
+                break;
+            }
+        }
+        //update_statistics.update(db_table_wrapper, db_partition, Some(db_row), now);
+        if has_statistics_to_update {
+            db_rows.push(db_row.clone());
+        }
+
+        json_array_writer.write(db_row.as_ref());
+
+        count += 1;
+    }
+
+    drop(table_inner);
+
+    if db_rows.len() > 0 {
+        app.sync_to_main_node
+            .update(
+                db_table.name.as_str(),
+                partition_key,
+                || db_rows.iter().map(|itm| itm.get_row_key()),
+                &update_statistics,
+            )
+            .await;
+    }
+
+    return Ok(ReadOperationResult::RowsArray(
+        json_array_writer.build().into_bytes(),
+    ));
 }

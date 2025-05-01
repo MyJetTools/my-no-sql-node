@@ -18,18 +18,18 @@ use super::models::GetRowInputModel;
         {status_code: 200, description: "Single Row or array of rows"},
     ]
 )]
-pub struct RowAction {
+pub struct GetRowsAction {
     app: Arc<AppContext>,
 }
 
-impl RowAction {
+impl GetRowsAction {
     pub fn new(app: Arc<AppContext>) -> Self {
         Self { app }
     }
 }
 
 async fn handle_request(
-    action: &RowAction,
+    action: &GetRowsAction,
     input_data: GetRowInputModel,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {

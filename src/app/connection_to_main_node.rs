@@ -2,10 +2,10 @@ use std::sync::{atomic::AtomicBool, Arc};
 
 use tokio::sync::RwLock;
 
-use crate::tcp_client_to_main_node::DataReaderTcpConnection;
+use crate::tcp_server::MyNoSqlTcpConnection;
 
 pub struct ConnectionToMainNode {
-    connection: RwLock<Option<Arc<DataReaderTcpConnection>>>,
+    connection: RwLock<Option<Arc<MyNoSqlTcpConnection>>>,
     has_connection: AtomicBool,
 }
 
@@ -17,7 +17,7 @@ impl ConnectionToMainNode {
         }
     }
 
-    pub async fn connected(&self, connection: Arc<DataReaderTcpConnection>) {
+    pub async fn connected(&self, connection: Arc<MyNoSqlTcpConnection>) {
         let mut write_access = self.connection.write().await;
         *write_access = Some(connection);
         self.has_connection
@@ -36,7 +36,7 @@ impl ConnectionToMainNode {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    pub async fn get(&self) -> Option<Arc<DataReaderTcpConnection>> {
+    pub async fn get(&self) -> Option<Arc<MyNoSqlTcpConnection>> {
         let read_access = self.connection.read().await;
         read_access.clone()
     }

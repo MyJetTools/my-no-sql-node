@@ -1,4 +1,5 @@
 use my_http_server::macros::*;
+use my_no_sql_sdk::tcp_contracts::sync_to_main::UpdateEntityStatisticsData;
 use std::sync::Arc;
 
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
@@ -7,7 +8,7 @@ use crate::{
     app::AppContext,
     data_readers::{http_connection::HttpPayload, DataReaderConnection},
     db_operations::DbOperationError,
-    http::{controllers::mappers::ToSetExpirationTime, http_sessions::HttpSessionsSupport},
+    http::http_sessions::HttpSessionsSupport,
 };
 
 use super::models::{GetChangesInputModel, UpdateExpirationDateTime};
@@ -62,6 +63,7 @@ async fn handle_request(
                     headers: None,
                     content_type: None,
                     content: payload,
+                    set_cookies: None,
                 }
                 .into_ok_result(false)
                 .into();
@@ -89,10 +91,22 @@ async fn update_expiration_time(
     }
 
     for item in items {
-        if let Some(set_expiration_time) = item
-            .set_db_partition_expiration_time
-            .to_set_expiration_time()
-        {
+        if let Some(set_expiration_time) = item.get_db_partition_expiration_time() {
+            app.sync_to_main_node
+                .update(
+                    table_name,
+                    &item.partition_key,
+                    || item.row_keys.iter().map(|itm| itm.as_str()),
+                    &UpdateEntityStatisticsData {
+                        partition_last_read_moment: false,
+                        row_last_read_moment: false,
+                        partition_expiration_moment: Some(Some(set_expiration_time)),
+                        row_expiration_moment: None,
+                    },
+                )
+                .await;
+
+            /*
             app.sync_to_main_node
                 .event_notifier
                 .update_partition_expiration_time(
@@ -101,17 +115,21 @@ async fn update_expiration_time(
                     set_expiration_time,
                 )
                 .await;
+             */
         }
 
-        if let Some(set_expiration_time) = item.set_db_rows_expiration_time.to_set_expiration_time()
-        {
+        if let Some(set_expiration_time) = item.get_db_rows_expiration_time() {
             app.sync_to_main_node
-                .event_notifier
-                .update_rows_expiration_time(
+                .update(
                     table_name,
                     &item.partition_key,
-                    item.row_keys.iter(),
-                    set_expiration_time,
+                    || item.row_keys.iter().map(|itm| itm.as_str()),
+                    &UpdateEntityStatisticsData {
+                        partition_last_read_moment: false,
+                        row_last_read_moment: false,
+                        partition_expiration_moment: None,
+                        row_expiration_moment: Some(Some(set_expiration_time)),
+                    },
                 )
                 .await;
         }

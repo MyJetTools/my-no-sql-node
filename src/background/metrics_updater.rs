@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rust_extensions::MyTimerTick;
+use my_no_sql_sdk::server::rust_extensions::MyTimerTick;
 
 use crate::app::AppContext;
 
@@ -26,12 +26,6 @@ impl MyTimerTick for MetricsUpdater {
                 .metrics
                 .update_table_metrics(db_table.name.as_str(), &table_metrics);
         }
-
-        let fatal_errors_count = self.app.logs.get_fatal_errors_amount();
-
-        self.app
-            .metrics
-            .update_fatal_errors_count(fatal_errors_count);
 
         for reader in self.app.data_readers.get_all().await {
             self.app

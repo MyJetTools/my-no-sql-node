@@ -1,5 +1,6 @@
 use my_http_server::macros::*;
 use my_http_server::types::RawDataTyped;
+use my_no_sql_sdk::core::rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::{Deserialize, Serialize};
 
 use crate::http::controllers::row_controller::models::BaseDbRowContract;
@@ -88,4 +89,16 @@ pub struct UpdateExpirationDateTime {
     pub set_db_rows_expiration_time: Option<String>,
     #[serde(rename = "pet")]
     pub set_db_partition_expiration_time: Option<String>,
+}
+
+impl UpdateExpirationDateTime {
+    pub fn get_db_rows_expiration_time(&self) -> Option<DateTimeAsMicroseconds> {
+        let result = self.set_db_rows_expiration_time.as_ref()?;
+        DateTimeAsMicroseconds::from_str(result)
+    }
+
+    pub fn get_db_partition_expiration_time(&self) -> Option<DateTimeAsMicroseconds> {
+        let result = self.set_db_partition_expiration_time.as_ref()?;
+        DateTimeAsMicroseconds::from_str(result)
+    }
 }

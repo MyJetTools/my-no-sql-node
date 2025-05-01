@@ -4,7 +4,7 @@ use my_no_sql_sdk::core::db_json_entity::DbJsonEntity;
 
 use crate::{
     app::AppContext,
-    db_sync::{states::InitPartitionsSyncData, EventSource, SyncEvent},
+    db_sync::{states::InitPartitionsSyncData, SyncEvent},
 };
 
 pub async fn sync_partition(
@@ -12,7 +12,6 @@ pub async fn sync_partition(
     table_name: String,
     partition_key: String,
     data: Vec<u8>,
-    event_src: EventSource,
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
@@ -24,10 +23,7 @@ pub async fn sync_partition(
 
     table_data.bulk_insert_or_replace(&partition_key, &entities);
 
-    let sync_data = InitPartitionsSyncData::new_as_update_partition(
-        &table_data,
-        partition_key.as_str(),
-        event_src,
-    );
-    crate::operations::sync::dispatch(app, SyncEvent::InitPartitions(sync_data));
+    let sync_data =
+        InitPartitionsSyncData::new_as_update_partition(&table_data, partition_key.as_str());
+    app.dispatch(SyncEvent::InitPartitions(sync_data));
 }

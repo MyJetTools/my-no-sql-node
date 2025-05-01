@@ -1,7 +1,6 @@
 use my_http_server::macros::*;
+use my_no_sql_sdk::server::DbTable;
 use serde::{Deserialize, Serialize};
-
-use my_no_sql_server_core::DbTableWrapper;
 
 #[derive(MyHttpInput)]
 pub struct GetTableSizeContract {
@@ -21,7 +20,7 @@ pub struct TableContract {
 }
 
 impl TableContract {
-    pub async fn from_table_wrapper(table_wrapper: &DbTableWrapper) -> Self {
+    pub async fn from_table_wrapper(table_wrapper: &DbTable) -> Self {
         Self {
             name: table_wrapper.name.to_string(),
         }

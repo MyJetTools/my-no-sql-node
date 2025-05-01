@@ -2,15 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     app::AppContext,
-    db_sync::{states::InitTableEventSyncData, EventSource, SyncEvent},
+    db_sync::{states::InitTableEventSyncData, SyncEvent},
 };
 
-pub async fn sync_table(
-    app: &Arc<AppContext>,
-    table_name: String,
-    data: Vec<u8>,
-    event_src: EventSource,
-) {
+pub async fn sync_table(app: &Arc<AppContext>, table_name: String, data: Vec<u8>) {
     let db_table_wrapper = super::get_or_add_table(app, table_name.as_str()).await;
 
     let entities =
@@ -24,7 +19,7 @@ pub async fn sync_table(
         db_table.bulk_insert_or_replace(&partition_key, &db_rows);
     }
 
-    let sync_data = InitTableEventSyncData::new(db_table_wrapper.clone(), event_src);
+    let sync_data = InitTableEventSyncData::new(db_table_wrapper.clone());
 
-    crate::operations::sync::dispatch(app, SyncEvent::InitTable(sync_data));
+    app.dispatch(SyncEvent::InitTable(sync_data));
 }

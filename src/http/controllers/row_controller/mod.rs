@@ -3,4 +3,4 @@ pub mod models;
 mod row;
 
 pub use count_action::RowCountAction;
-pub use row::RowAction;
+pub use row::GetRowsAction;

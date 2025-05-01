@@ -1,19 +1,18 @@
-use my_no_sql_sdk::core::db::DbTable;
-use my_no_sql_server_core::db_snapshots::DbRowsByPartitionsSnapshot;
-
-use crate::db_sync::EventSource;
+use my_no_sql_sdk::{
+    core::db::{DbTableInner, DbTableName},
+    server::db_snapshots::DbRowsByPartitionsSnapshot,
+};
 
 pub struct UpdateRowsSyncData {
-    pub table_name: String,
-    pub event_src: EventSource,
+    pub table_name: DbTableName,
+
     pub rows_by_partition: DbRowsByPartitionsSnapshot,
 }
 
 impl UpdateRowsSyncData {
-    pub fn new(db_table: &DbTable, event_src: EventSource) -> Self {
+    pub fn new(db_table: &DbTableInner) -> Self {
         Self {
             table_name: db_table.name.clone(),
-            event_src,
             rows_by_partition: DbRowsByPartitionsSnapshot::new(),
         }
     }

@@ -14,7 +14,6 @@ pub struct PrometheusMetrics {
     table_size: IntGaugeVec,
     tcp_connections_count: IntGauge,
     tcp_connections_changes: IntGaugeVec,
-    fatal_errors_count: IntGauge,
     pending_to_sync: IntGaugeVec,
 }
 
@@ -67,7 +66,6 @@ impl PrometheusMetrics {
             table_size,
             tcp_connections_count,
             tcp_connections_changes,
-            fatal_errors_count,
             pending_to_sync,
         };
     }
@@ -134,10 +132,6 @@ impl PrometheusMetrics {
         self.tcp_connections_changes
             .with_label_values(&["disconnected"])
             .inc();
-    }
-
-    pub fn update_fatal_errors_count(&self, value: i64) {
-        self.fatal_errors_count.set(value);
     }
 
     pub fn build(&self) -> String {

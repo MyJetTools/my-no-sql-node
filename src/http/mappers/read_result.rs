@@ -10,6 +10,7 @@ impl Into<HttpOkResult> for ReadOperationResult {
                     headers: None,
                     content,
                     content_type: Some(WebContentType::Json),
+                    set_cookies: None,
                 };
 
                 HttpOkResult {
@@ -22,6 +23,7 @@ impl Into<HttpOkResult> for ReadOperationResult {
                     headers: None,
                     content,
                     content_type: Some(WebContentType::Json),
+                    set_cookies: None,
                 };
 
                 HttpOkResult {
@@ -30,15 +32,13 @@ impl Into<HttpOkResult> for ReadOperationResult {
                 }
             }
             ReadOperationResult::EmptyArray => {
-                let empty_array = vec![
-                    my_json::json_reader::consts::OPEN_ARRAY,
-                    my_json::json_reader::consts::CLOSE_ARRAY,
-                ];
+                let empty_array = vec![my_json::consts::OPEN_ARRAY, my_json::consts::CLOSE_ARRAY];
 
                 let output = HttpOutput::Content {
                     headers: None,
                     content: empty_array,
                     content_type: Some(WebContentType::Json),
+                    set_cookies: None,
                 };
 
                 HttpOkResult {

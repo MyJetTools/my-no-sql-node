@@ -1,4 +1,4 @@
-use my_no_sql_server_core::DbTableWrapper;
+use my_no_sql_sdk::server::DbTable;
 
 pub struct DbTableMetrics {
     pub table_size: usize,
@@ -6,7 +6,7 @@ pub struct DbTableMetrics {
     pub records_amount: usize,
 }
 
-pub async fn get_table_metrics(db_table_wrapper: &DbTableWrapper) -> DbTableMetrics {
+pub async fn get_table_metrics(db_table_wrapper: &DbTable) -> DbTableMetrics {
     let table_read_access = db_table_wrapper.data.read().await;
 
     DbTableMetrics {

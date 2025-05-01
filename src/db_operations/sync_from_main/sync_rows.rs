@@ -1,16 +1,13 @@
 use std::sync::Arc;
 
+use my_no_sql_sdk::core::db::PartitionKey;
+
 use crate::{
     app::AppContext,
-    db_sync::{states::UpdateRowsSyncData, EventSource, SyncEvent},
+    db_sync::{states::UpdateRowsSyncData, SyncEvent},
 };
 
-pub async fn sync_rows(
-    app: &Arc<AppContext>,
-    table_name: String,
-    data: Vec<u8>,
-    event_src: EventSource,
-) {
+pub async fn sync_rows(app: &Arc<AppContext>, table_name: String, data: Vec<u8>) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
     let entities =
@@ -18,15 +15,15 @@ pub async fn sync_rows(
 
     let mut table_data = db_table.data.write().await;
 
-    let mut sync_data = UpdateRowsSyncData::new(&table_data, event_src);
+    let mut sync_data = UpdateRowsSyncData::new(&table_data);
 
     for (partition_key, db_rows) in entities {
         table_data.bulk_insert_or_replace(&partition_key, &db_rows);
 
-        sync_data
-            .rows_by_partition
-            .add_rows(partition_key.as_str(), db_rows);
+        let partition_key = PartitionKey::new(partition_key);
+
+        sync_data.rows_by_partition.add_rows(partition_key, db_rows);
     }
 
-    crate::operations::sync::dispatch(app, SyncEvent::UpdateRows(sync_data));
+    app.dispatch(SyncEvent::UpdateRows(sync_data));
 }

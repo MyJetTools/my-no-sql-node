@@ -36,7 +36,7 @@ pub async fn subscribe(
         let node_connection = node_connection.unwrap();
 
         node_connection
-            .send(MyNoSqlTcpContract::SubscribeAsNode(table_name.to_string()))
+            .send(&MyNoSqlTcpContract::SubscribeAsNode(table_name.to_string()))
             .await;
 
         return Ok(());
@@ -46,13 +46,10 @@ pub async fn subscribe(
 
     data_reader.subscribe(db_table.clone()).await;
 
-    crate::operations::sync::dispatch(
-        app,
-        SyncEvent::TableFirstInit(TableFirstInitSyncData {
-            db_table,
-            data_reader,
-        }),
-    );
+    app.dispatch(SyncEvent::TableFirstInit(TableFirstInitSyncData {
+        db_table,
+        data_reader,
+    }));
 
     Ok(())
 }
