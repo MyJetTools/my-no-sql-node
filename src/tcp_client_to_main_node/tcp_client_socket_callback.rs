@@ -9,6 +9,7 @@ use my_tcp_sockets::{tcp_connection::TcpSocketConnection, SocketEventCallback};
 
 use crate::{app::AppContext, tcp_server::MyNoSqlTcpConnection};
 
+#[derive(Clone)]
 pub struct TcpClientSocketCallback {
     app: Arc<AppContext>,
 }
@@ -24,7 +25,7 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
     for TcpClientSocketCallback
 {
     async fn connected(
-        &self,
+        &mut self,
         connection: Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
     ) {
         let contract = MyNoSqlTcpContract::GreetingFromNode {
@@ -33,13 +34,13 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
             compress: self.app.settings.compress,
         };
 
-        connection.send(&contract).await;
+        connection.send(&contract);
 
-        let tables = self.app.db.get_tables().await;
+        let tables = self.app.db.get_tables();
 
-        for table in tables {
+        for table in tables.iter() {
             let contract = MyNoSqlTcpContract::SubscribeAsNode(table.name.to_string());
-            connection.send(&contract).await;
+            connection.send(&contract);
         }
 
         self.app
@@ -52,7 +53,7 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
             .tcp_events_pusher_new_connection_established(connection);
     }
 
-    async fn disconnected(&self, connection: Arc<MyNoSqlTcpConnection>) {
+    async fn disconnected(&mut self, connection: Arc<MyNoSqlTcpConnection>) {
         self.app.connected_to_main_node.disconnected().await;
 
         self.app
@@ -60,7 +61,11 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
             .tcp_events_pusher_connection_disconnected(connection);
     }
 
-    async fn payload(&self, connection: &Arc<MyNoSqlTcpConnection>, contract: MyNoSqlTcpContract) {
+    async fn payload(
+        &mut self,
+        connection: &Arc<MyNoSqlTcpConnection>,
+        contract: MyNoSqlTcpContract,
+    ) {
         if let MyNoSqlTcpContract::CompressedPayload(data) = &contract {
             println!("CompressedPayload: {}", data.len());
         }

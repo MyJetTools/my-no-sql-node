@@ -12,7 +12,7 @@ pub async fn get_partitions(
 ) -> Result<(usize, Vec<String>), DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let table_data = db_table.data.read().await;
+    let table_data = db_table.data.read();
 
     let count = table_data.partitions.len();
 

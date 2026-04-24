@@ -1,6 +1,6 @@
 use crate::db_operations::DbOperationError;
 
-use my_http_server::{HttpFailResult, WebContentType};
+use my_http_server::{HttpFailResult, HttpOutput, WebContentType};
 
 use super::{OperationFailHttpContract, OperationFailReason};
 
@@ -16,38 +16,34 @@ impl From<DbOperationError> for HttpFailResult {
                 };
                 let content = serde_json::to_vec(&err_model).unwrap();
 
-                HttpFailResult {
-                    content_type: WebContentType::Json,
+                HttpOutput::Content {
+                    headers: WebContentType::Json.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: true,
-                    write_to_log: false,
                 }
+                .into_http_fail_result(true, true)
             }
             DbOperationError::TableNotFound(table_name) => {
                 super::super::get_table::table_not_found_http_result(table_name.as_str())
             }
-            DbOperationError::RecordNotFound => HttpFailResult {
-                content_type: WebContentType::Json,
+            DbOperationError::RecordNotFound => HttpOutput::Content {
+                headers: WebContentType::Json.into(),
                 status_code: 404,
                 content: format!("Record not found").into_bytes(),
-                write_telemetry: false,
-                write_to_log: true,
-            },
-            DbOperationError::ApplicationIsNotInitializedYet => HttpFailResult {
-                content_type: WebContentType::Json,
+            }
+            .into_http_fail_result(false, false),
+            DbOperationError::ApplicationIsNotInitializedYet => HttpOutput::Content {
+                headers: WebContentType::Json.into(),
                 status_code: 503,
                 content: format!("Application is not initialized yet").into_bytes(),
-                write_telemetry: false,
-                write_to_log: false,
-            },
-            DbOperationError::OptimisticConcurencyUpdateFails => HttpFailResult {
-                content_type: WebContentType::Json,
+            }
+            .into_http_fail_result(false, false),
+            DbOperationError::OptimisticConcurencyUpdateFails => HttpOutput::Content {
+                headers: WebContentType::Json.into(),
                 status_code: 409,
                 content: format!("Record is changed").into_bytes(),
-                write_telemetry: false,
-                write_to_log: false,
-            },
+            }
+            .into_http_fail_result(false, false),
             DbOperationError::RecordAlreadyExists => {
                 let err_model = OperationFailHttpContract {
                     reason: OperationFailReason::RecordAlreadyExists,
@@ -55,13 +51,12 @@ impl From<DbOperationError> for HttpFailResult {
                 };
                 let content = serde_json::to_vec(&err_model).unwrap();
 
-                HttpFailResult {
-                    content_type: WebContentType::Json,
+                HttpOutput::Content {
+                    headers: WebContentType::Json.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: false,
-                    write_to_log: false,
                 }
+                .into_http_fail_result(false, false)
             }
             DbOperationError::TimeStampFieldRequires => {
                 let err_model = OperationFailHttpContract {
@@ -70,13 +65,12 @@ impl From<DbOperationError> for HttpFailResult {
                 };
 
                 let content = serde_json::to_vec(&err_model).unwrap();
-                HttpFailResult {
-                    content_type: WebContentType::Text,
+                HttpOutput::Content {
+                    headers: WebContentType::Text.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: true,
-                    write_to_log: true,
                 }
+                .into_http_fail_result(true, true)
             }
             DbOperationError::TableNameValidationError(reason) => {
                 let err_model = OperationFailHttpContract {
@@ -85,13 +79,12 @@ impl From<DbOperationError> for HttpFailResult {
                 };
 
                 let content = serde_json::to_vec(&err_model).unwrap();
-                HttpFailResult {
-                    content_type: WebContentType::Text,
+                HttpOutput::Content {
+                    headers: WebContentType::Text.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: true,
-                    write_to_log: true,
                 }
+                .into_http_fail_result(true, true)
             }
             DbOperationError::DbEntityParseFail(src) => {
                 let err_model = OperationFailHttpContract {
@@ -101,13 +94,12 @@ impl From<DbOperationError> for HttpFailResult {
 
                 let content = serde_json::to_vec(&err_model).unwrap();
 
-                HttpFailResult {
-                    content_type: WebContentType::Json,
+                HttpOutput::Content {
+                    headers: WebContentType::Json.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: true,
-                    write_to_log: true,
                 }
+                .into_http_fail_result(true, true)
             }
             DbOperationError::NoConnectionToMainNode => {
                 let err_model = OperationFailHttpContract {
@@ -117,13 +109,12 @@ impl From<DbOperationError> for HttpFailResult {
 
                 let content = serde_json::to_vec(&err_model).unwrap();
 
-                HttpFailResult {
-                    content_type: WebContentType::Json,
+                HttpOutput::Content {
+                    headers: WebContentType::Json.into(),
                     status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
                     content,
-                    write_telemetry: true,
-                    write_to_log: true,
                 }
+                .into_http_fail_result(true, true)
             }
         }
     }

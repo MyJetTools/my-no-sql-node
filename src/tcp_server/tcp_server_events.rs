@@ -10,6 +10,8 @@ use crate::app::AppContext;
 
 pub type MyNoSqlTcpConnection =
     TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>;
+
+#[derive(Clone)]
 pub struct TcpServerEvents {
     app: Arc<AppContext>,
 }
@@ -23,7 +25,7 @@ impl TcpServerEvents {
 #[async_trait::async_trait]
 impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for TcpServerEvents {
     async fn connected(
-        &self,
+        &mut self,
         connection: Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
     ) {
         my_logger::LOGGER.write_info(
@@ -36,7 +38,7 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
         self.app.metrics.mark_new_tcp_connection();
     }
     async fn disconnected(
-        &self,
+        &mut self,
         connection: Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
     ) {
         my_logger::LOGGER.write_info(
@@ -54,13 +56,13 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
     }
 
     async fn payload(
-        &self,
+        &mut self,
         connection: &Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
         contract: MyNoSqlTcpContract,
     ) {
         match contract {
             MyNoSqlTcpContract::Ping => {
-                connection.send(&MyNoSqlTcpContract::Pong).await;
+                connection.send(&MyNoSqlTcpContract::Pong);
             }
             MyNoSqlTcpContract::Greeting { name } => {
                 if let Some(data_reader) = self.app.data_readers.get_tcp(connection.as_ref()).await
@@ -108,9 +110,7 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
                                 .add("TableName", table_name.to_string()),
                         );
 
-                        connection
-                            .send(&MyNoSqlTcpContract::Error { message })
-                            .await;
+                        connection.send(&MyNoSqlTcpContract::Error { message });
                     }
                 }
             }
@@ -120,25 +120,20 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
                 partitions,
             } => {
                 for (partition_key, expiration_time) in partitions {
-                    self.app
-                        .sync_to_main_node
-                        .update(
-                            table_name.as_str(),
-                            &partition_key,
-                            || [].into_iter(),
-                            &UpdateEntityStatisticsData {
-                                partition_last_read_moment: false,
-                                row_last_read_moment: false,
-                                partition_expiration_moment: Some(expiration_time),
-                                row_expiration_moment: None,
-                            },
-                        )
-                        .await;
+                    self.app.sync_to_main_node.update(
+                        table_name.as_str(),
+                        &partition_key,
+                        || [].into_iter(),
+                        &UpdateEntityStatisticsData {
+                            partition_last_read_moment: false,
+                            row_last_read_moment: false,
+                            partition_expiration_moment: Some(expiration_time),
+                            row_expiration_moment: None,
+                        },
+                    );
                 }
 
-                connection
-                    .send(&MyNoSqlTcpContract::Confirmation { confirmation_id })
-                    .await;
+                connection.send(&MyNoSqlTcpContract::Confirmation { confirmation_id });
             }
 
             MyNoSqlTcpContract::UpdateRowsExpirationTime {
@@ -148,24 +143,19 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
                 row_keys,
                 expiration_time,
             } => {
-                self.app
-                    .sync_to_main_node
-                    .update(
-                        table_name.as_str(),
-                        &partition_key,
-                        || row_keys.iter().map(|itm| itm.as_str()),
-                        &UpdateEntityStatisticsData {
-                            partition_last_read_moment: false,
-                            row_last_read_moment: false,
-                            partition_expiration_moment: None,
-                            row_expiration_moment: Some(expiration_time),
-                        },
-                    )
-                    .await;
+                self.app.sync_to_main_node.update(
+                    table_name.as_str(),
+                    &partition_key,
+                    || row_keys.iter().map(|itm| itm.as_str()),
+                    &UpdateEntityStatisticsData {
+                        partition_last_read_moment: false,
+                        row_last_read_moment: false,
+                        partition_expiration_moment: None,
+                        row_expiration_moment: Some(expiration_time),
+                    },
+                );
 
-                connection
-                    .send(&MyNoSqlTcpContract::Confirmation { confirmation_id })
-                    .await;
+                connection.send(&MyNoSqlTcpContract::Confirmation { confirmation_id });
             }
 
             MyNoSqlTcpContract::UpdateRowsLastReadTime {
@@ -174,24 +164,19 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
                 partition_key,
                 row_keys,
             } => {
-                self.app
-                    .sync_to_main_node
-                    .update(
-                        table_name.as_str(),
-                        &partition_key,
-                        || row_keys.iter().map(|itm| itm.as_str()),
-                        &UpdateEntityStatisticsData {
-                            partition_last_read_moment: false,
-                            row_last_read_moment: true,
-                            partition_expiration_moment: None,
-                            row_expiration_moment: None,
-                        },
-                    )
-                    .await;
+                self.app.sync_to_main_node.update(
+                    table_name.as_str(),
+                    &partition_key,
+                    || row_keys.iter().map(|itm| itm.as_str()),
+                    &UpdateEntityStatisticsData {
+                        partition_last_read_moment: false,
+                        row_last_read_moment: true,
+                        partition_expiration_moment: None,
+                        row_expiration_moment: None,
+                    },
+                );
 
-                connection
-                    .send(&MyNoSqlTcpContract::Confirmation { confirmation_id })
-                    .await;
+                connection.send(&MyNoSqlTcpContract::Confirmation { confirmation_id });
             }
             MyNoSqlTcpContract::UpdatePartitionsLastReadTime {
                 confirmation_id,
@@ -199,25 +184,20 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
                 partitions,
             } => {
                 for partition_key in partitions {
-                    self.app
-                        .sync_to_main_node
-                        .update(
-                            table_name.as_str(),
-                            &partition_key,
-                            || [].into_iter(),
-                            &UpdateEntityStatisticsData {
-                                partition_last_read_moment: true,
-                                row_last_read_moment: false,
-                                partition_expiration_moment: None,
-                                row_expiration_moment: None,
-                            },
-                        )
-                        .await;
+                    self.app.sync_to_main_node.update(
+                        table_name.as_str(),
+                        &partition_key,
+                        || [].into_iter(),
+                        &UpdateEntityStatisticsData {
+                            partition_last_read_moment: true,
+                            row_last_read_moment: false,
+                            partition_expiration_moment: None,
+                            row_expiration_moment: None,
+                        },
+                    );
                 }
 
-                connection
-                    .send(&MyNoSqlTcpContract::Confirmation { confirmation_id })
-                    .await;
+                connection.send(&MyNoSqlTcpContract::Confirmation { confirmation_id });
             }
             _ => {}
         }

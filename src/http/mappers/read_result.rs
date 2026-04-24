@@ -7,10 +7,9 @@ impl Into<HttpOkResult> for ReadOperationResult {
         match self {
             ReadOperationResult::SingleRow(content) => {
                 let output = HttpOutput::Content {
-                    headers: None,
+                    status_code: 200,
+                    headers: WebContentType::Json.into(),
                     content,
-                    content_type: Some(WebContentType::Json),
-                    set_cookies: None,
                 };
 
                 HttpOkResult {
@@ -20,10 +19,9 @@ impl Into<HttpOkResult> for ReadOperationResult {
             }
             ReadOperationResult::RowsArray(content) => {
                 let output = HttpOutput::Content {
-                    headers: None,
+                    status_code: 200,
+                    headers: WebContentType::Json.into(),
                     content,
-                    content_type: Some(WebContentType::Json),
-                    set_cookies: None,
                 };
 
                 HttpOkResult {
@@ -35,10 +33,9 @@ impl Into<HttpOkResult> for ReadOperationResult {
                 let empty_array = vec![my_json::consts::OPEN_ARRAY, my_json::consts::CLOSE_ARRAY];
 
                 let output = HttpOutput::Content {
-                    headers: None,
+                    status_code: 200,
+                    headers: WebContentType::Json.into(),
                     content: empty_array,
-                    content_type: Some(WebContentType::Json),
-                    set_cookies: None,
                 };
 
                 HttpOkResult {

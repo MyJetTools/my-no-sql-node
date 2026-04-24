@@ -13,7 +13,7 @@ pub async fn get_single_partition_multiple_rows(
     update_statistics: UpdateEntityStatisticsData,
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
-    let table_inner = db_table.data.read().await;
+    let table_inner = db_table.data.read();
 
     let db_partition = table_inner.get_partition(partition_key);
 
@@ -34,21 +34,19 @@ pub async fn get_single_partition_multiple_rows(
             if has_update_statistics {
                 db_rows.push(db_row.clone());
             }
-            json_array_writer.write(db_row.as_ref());
+            json_array_writer = json_array_writer.write(db_row.as_ref());
         }
     }
 
     drop(table_inner);
 
     if db_rows.len() > 0 {
-        app.sync_to_main_node
-            .update(
-                db_table.name.as_str(),
-                partition_key,
-                || db_rows.iter().map(|itm| itm.get_row_key()),
-                &update_statistics,
-            )
-            .await;
+        app.sync_to_main_node.update(
+            db_table.name.as_str(),
+            partition_key,
+            || db_rows.iter().map(|itm| itm.get_row_key()),
+            &update_statistics,
+        );
     }
 
     return Ok(ReadOperationResult::RowsArray(

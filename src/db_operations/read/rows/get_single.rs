@@ -13,7 +13,7 @@ pub async fn get_single(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let table_inner = db_table.data.read().await;
+    let table_inner = db_table.data.read();
 
     let db_partition = table_inner.get_partition(partition_key);
 
@@ -33,14 +33,12 @@ pub async fn get_single(
 
     drop(table_inner);
 
-    app.sync_to_main_node
-        .update(
-            db_table.name.as_str(),
-            partition_key,
-            || [db_row.get_row_key()].into_iter(),
-            &update_statistics,
-        )
-        .await;
+    app.sync_to_main_node.update(
+        db_table.name.as_str(),
+        partition_key,
+        || [db_row.get_row_key()].into_iter(),
+        &update_statistics,
+    );
 
     return Ok(ReadOperationResult::SingleRow(db_row.to_vec()));
 }

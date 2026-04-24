@@ -46,11 +46,11 @@ pub struct StatusModel {
 impl StatusModel {
     pub async fn new(app: &AppContext) -> Self {
         let (readers, tcp, http) = get_readers(app).await;
-        let tables = app.db.get_tables().await;
+        let tables = app.db.get_tables();
 
         let mut tables_model = Vec::new();
 
-        for table in &tables {
+        for table in tables.iter() {
             let metrics = crate::operations::get_table_metrics(table.as_ref()).await;
 
             let table_model = TableModel {

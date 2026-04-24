@@ -13,7 +13,7 @@ pub async fn sync_rows(app: &Arc<AppContext>, table_name: String, data: Vec<u8>)
     let entities =
         crate::db_operations::parse_json_entity::restore_as_btree_map(data.as_slice()).unwrap();
 
-    let mut table_data = db_table.data.write().await;
+    let mut table_data = db_table.data.write();
 
     let mut sync_data = UpdateRowsSyncData::new(&table_data);
 

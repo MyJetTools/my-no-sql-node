@@ -14,7 +14,7 @@ pub async fn get_all_by_partition_key(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let inner = db_table.data.read().await;
+    let inner = db_table.data.read();
 
     let db_partition = inner.get_partition(partition_key);
 
@@ -32,14 +32,12 @@ pub async fn get_all_by_partition_key(
 
     if update_statistics.has_data_to_update() {
         if db_rows.len() > 0 {
-            app.sync_to_main_node
-                .update(
-                    db_table.name.as_str(),
-                    partition_key,
-                    || db_rows.iter().map(|itm| itm.get_row_key()),
-                    &update_statistics,
-                )
-                .await;
+            app.sync_to_main_node.update(
+                db_table.name.as_str(),
+                partition_key,
+                || db_rows.iter().map(|itm| itm.get_row_key()),
+                &update_statistics,
+            );
         }
     }
 

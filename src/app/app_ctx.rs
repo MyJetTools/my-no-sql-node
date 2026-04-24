@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use my_no_sql_sdk::server::rust_extensions::{events_loop::EventsLoopMutexWrapped, AppStates};
+use my_no_sql_sdk::server::rust_extensions::{events_loop::EventsLoop, AppStates};
 use my_no_sql_sdk::server::DbInstance;
 use my_no_sql_sdk::tcp_contracts::sync_to_main::SyncToMainNodeHandler;
 use my_tcp_sockets::TcpClient;
@@ -24,7 +24,7 @@ pub struct AppContext {
     pub data_readers: DataReadersList,
 
     pub settings: Arc<SettingsModel>,
-    pub sync_to_client_events_loop: EventsLoopMutexWrapped<SyncEvent>,
+    pub sync_to_client_events_loop: EventsLoop<SyncEvent>,
     pub states: Arc<AppStates>,
     pub node_connection_tcp_client: TcpClient,
 
@@ -39,7 +39,7 @@ impl AppContext {
         let node_connection_tcp_client =
             TcpClient::new("NodeConnection".to_string(), settings.clone());
         AppContext {
-            sync_to_main_node: SyncToMainNodeHandler::new(my_logger::LOGGER.clone()),
+            sync_to_main_node: SyncToMainNodeHandler::new(),
             db: DbInstance::new(),
             metrics: PrometheusMetrics::new(),
             process_id: uuid::Uuid::new_v4().to_string(),
@@ -48,7 +48,7 @@ impl AppContext {
             data_readers: DataReadersList::new(Duration::from_secs(30)),
 
             settings,
-            sync_to_client_events_loop: EventsLoopMutexWrapped::new("SyncEventsLoop".to_string()),
+            sync_to_client_events_loop: EventsLoop::new("SyncEventsLoop".to_string()),
             node_connection_tcp_client,
             master_node_ping_interval: AtomicI64::new(0),
             connected_to_main_node: ConnectionToMainNode::new(),

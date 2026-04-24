@@ -60,10 +60,9 @@ async fn handle_request(
             HttpPayload::Ping => return HttpOutput::Empty.into_ok_result(false).into(),
             HttpPayload::Payload(payload) => {
                 return HttpOutput::Content {
-                    headers: None,
-                    content_type: None,
+                    status_code: 200,
+                    headers: Default::default(),
                     content: payload,
-                    set_cookies: None,
                 }
                 .into_ok_result(false)
                 .into();
@@ -71,13 +70,12 @@ async fn handle_request(
         }
     }
 
-    return Err(HttpFailResult {
-        content_type: WebContentType::Text,
+    HttpOutput::Content {
         status_code: 400,
+        headers: WebContentType::Text.into(),
         content: "Only HTTP sessions are supported".to_string().into_bytes(),
-        write_telemetry: true,
-        write_to_log: true,
-    });
+    }
+    .into_err(true, true)
 }
 
 async fn update_expiration_time(
@@ -85,7 +83,7 @@ async fn update_expiration_time(
     table_name: &str,
     items: &[UpdateExpirationDateTime],
 ) -> Result<(), DbOperationError> {
-    let db_table = app.db.get_table(table_name).await;
+    let db_table = app.db.get_table(table_name);
     if db_table.is_none() {
         return Ok(());
     }
@@ -103,8 +101,7 @@ async fn update_expiration_time(
                         partition_expiration_moment: Some(Some(set_expiration_time)),
                         row_expiration_moment: None,
                     },
-                )
-                .await;
+                );
 
             /*
             app.sync_to_main_node
@@ -113,8 +110,7 @@ async fn update_expiration_time(
                     table_name,
                     &item.partition_key,
                     set_expiration_time,
-                )
-                .await;
+                );
              */
         }
 
@@ -130,8 +126,7 @@ async fn update_expiration_time(
                         partition_expiration_moment: None,
                         row_expiration_moment: Some(Some(set_expiration_time)),
                     },
-                )
-                .await;
+                );
         }
     }
 

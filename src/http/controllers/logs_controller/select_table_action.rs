@@ -27,7 +27,7 @@ async fn handle_request(
 
     body.push_str("<h1>Please, select table to show logs</h1>");
 
-    for table_name in &action.app.db.get_table_names().await {
+    for table_name in action.app.db.get_table_names().iter() {
         let line = format!(
             "<a class='btn btn-sm btn-outline-primary' href='/logs/table/{table_name}'>{table_name}</a>",
         );

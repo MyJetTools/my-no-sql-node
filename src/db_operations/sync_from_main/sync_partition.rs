@@ -17,7 +17,7 @@ pub async fn sync_partition(
 
     let entities = DbJsonEntity::restore_as_vec(data.as_slice()).unwrap();
 
-    let mut table_data = db_table.data.write().await;
+    let mut table_data = db_table.data.write();
 
     table_data.remove_partition(&partition_key);
 

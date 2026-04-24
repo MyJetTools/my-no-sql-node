@@ -5,21 +5,15 @@ use my_no_sql_sdk::{core::db::DbTableInner, server::DbTable};
 use crate::app::AppContext;
 
 pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<DbTable> {
-    let db_table = app.db.get_table(table_name).await;
+    let (db_table, just_created) = app.db.get_or_create(table_name, || {
+        DbTable::new(DbTableInner::new(table_name.to_string().into()))
+    });
 
-    if db_table.is_some() {
-        return db_table.unwrap();
+    if !just_created {
+        return db_table;
     }
 
-    let inner = DbTableInner::new(table_name.to_string().into());
-
-    let db_table_wrapper = DbTable::new(inner);
-
-    {
-        println!("Lazy initializing table: {}", table_name);
-        let mut write_access = app.db.tables.write().await;
-        write_access.insert(table_name.to_string(), db_table_wrapper.clone());
-    }
+    println!("Lazy initializing table: {}", table_name);
 
     let data_readers = app.data_readers.get_all().await;
 
@@ -34,5 +28,5 @@ pub async fn get_or_add_table(app: &Arc<AppContext>, table_name: &str) -> Arc<Db
         }
     }
 
-    db_table_wrapper
+    db_table
 }

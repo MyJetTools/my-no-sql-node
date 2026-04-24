@@ -25,7 +25,7 @@ pub fn filter_and_compile_json<'s>(
 
         db_rows.push(db_row.clone());
 
-        result.write(db_row.as_ref());
+        result = result.write(db_row.as_ref());
         added += 1;
 
         if let Some(limit) = limit {

@@ -40,7 +40,7 @@ async fn handle_request(
         crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_str())
             .await?;
 
-    let partitions_amount = db_table.get_table_size().await;
+    let partitions_amount = db_table.get_table_size();
 
     HttpOutput::as_text(format!("{}", partitions_amount))
         .into_ok_result(true)

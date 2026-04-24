@@ -15,22 +15,20 @@ pub async fn get_all_by_row_key(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let table_data = db_table.data.read().await;
+    let table_data = db_table.data.read();
 
     let mut json_array_writer = JsonArrayWriter::new();
     for (db_partition, db_row) in table_data.get_by_row_key(row_key, skip, limit) {
         if update_statistics.has_data_to_update() {
-            app.sync_to_main_node
-                .update(
-                    db_table.name.as_str(),
-                    db_partition.partition_key.as_str(),
-                    || [row_key].into_iter(),
-                    &update_statistics,
-                )
-                .await;
+            app.sync_to_main_node.update(
+                db_table.name.as_str(),
+                db_partition.partition_key.as_str(),
+                || [row_key].into_iter(),
+                &update_statistics,
+            );
         }
 
-        json_array_writer.write(db_row.as_ref());
+        json_array_writer = json_array_writer.write(db_row.as_ref());
     }
 
     return Ok(ReadOperationResult::RowsArray(

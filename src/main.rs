@@ -47,14 +47,14 @@ async fn main() {
     timer_10s.start(app.states.clone(), my_logger::LOGGER.clone());
 
     app.sync_to_client_events_loop
-        .register_event_loop(Arc::new(SyncEventsToClients::new(app.clone())))
-        .await;
+        .register_event_loop(Arc::new(SyncEventsToClients::new(app.clone())));
 
     app.sync_to_client_events_loop
-        .start(app.states.clone(), my_logger::LOGGER.clone())
-        .await;
+        .start(app.states.clone(), my_logger::LOGGER.clone());
 
-    app.sync_to_main_node.start(app.states.clone()).await;
+    app.sync_to_main_node
+        .start(my_logger::LOGGER.clone(), app.states.clone())
+        .await;
 
     crate::http::start_up::setup_server(&app);
 
@@ -66,15 +66,13 @@ async fn main() {
     tcp_server
         .start(
             Arc::new(MyNoSqlTcpSerializerFactory),
-            Arc::new(TcpServerEvents::new(app.clone())),
+            TcpServerEvents::new(app.clone()),
             app.states.clone(),
             my_logger::LOGGER.clone(),
         )
         .await;
 
     let socket_callback = TcpClientSocketCallback::new(app.clone());
-
-    let socket_callback = Arc::new(socket_callback);
 
     app.node_connection_tcp_client
         .start(

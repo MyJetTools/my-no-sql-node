@@ -14,7 +14,7 @@ pub async fn delete_rows(
 ) {
     let db_table = super::get_or_add_table(app, table_name.as_str()).await;
 
-    let mut table_data = db_table.data.write().await;
+    let mut table_data = db_table.data.write();
 
     let mut sync_data = DeleteRowsEventSyncData::new(&table_data);
 

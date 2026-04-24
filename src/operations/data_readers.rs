@@ -14,7 +14,7 @@ pub async fn subscribe(
     data_reader: Arc<DataReader>,
     table_name: &str,
 ) -> Result<(), DbOperationError> {
-    let table = app.db.get_table(table_name).await;
+    let table = app.db.get_table(table_name);
 
     if table.is_none() {
         println!(
@@ -35,9 +35,7 @@ pub async fn subscribe(
 
         let node_connection = node_connection.unwrap();
 
-        node_connection
-            .send(&MyNoSqlTcpContract::SubscribeAsNode(table_name.to_string()))
-            .await;
+        node_connection.send(&MyNoSqlTcpContract::SubscribeAsNode(table_name.to_string()));
 
         return Ok(());
     }

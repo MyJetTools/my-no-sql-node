@@ -31,12 +31,12 @@ async fn handle_request(
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
     crate::db_operations::check_app_states(action.app.as_ref())?;
-    let tables = action.app.db.get_tables().await;
+    let tables = action.app.db.get_tables();
 
     let mut response: Vec<TableContract> = vec![];
 
-    for db_table in &tables {
-        response.push(TableContract::from_table_wrapper(db_table.as_ref()).await);
+    for db_table in tables.iter() {
+        response.push(TableContract::from_table_wrapper(db_table.as_ref()));
     }
 
     HttpOutput::as_json(response).into_ok_result(true).into()

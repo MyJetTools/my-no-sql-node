@@ -55,7 +55,7 @@ impl TcpConnectionInfo {
     }
 
     pub async fn send(&self, contract: &MyNoSqlTcpContract) {
-        let size = self.connection.send(contract).await;
+        let size = self.connection.send(contract);
         self.sent_per_second_accumulator
             .fetch_add(size, std::sync::atomic::Ordering::SeqCst);
     }

@@ -16,7 +16,7 @@ pub async fn get_all(
 ) -> Result<ReadOperationResult, DbOperationError> {
     super::super::super::check_app_states(app)?;
 
-    let table_inner = db_table.data.read().await;
+    let table_inner = db_table.data.read();
 
     let mut db_rows_statistics: HashMap<
         String,
@@ -37,20 +37,18 @@ pub async fn get_all(
                 }
             }
         }
-        json_array_writer.write(db_row.as_ref());
+        json_array_writer = json_array_writer.write(db_row.as_ref());
     }
 
     drop(table_inner);
 
     for (partition_key, db_rows) in db_rows_statistics {
-        app.sync_to_main_node
-            .update(
-                db_table.name.as_str(),
-                &partition_key,
-                || db_rows.iter().map(|itm| itm.get_row_key()),
-                &update_statistics,
-            )
-            .await;
+        app.sync_to_main_node.update(
+            db_table.name.as_str(),
+            &partition_key,
+            || db_rows.iter().map(|itm| itm.get_row_key()),
+            &update_statistics,
+        );
     }
 
     return Ok(ReadOperationResult::RowsArray(

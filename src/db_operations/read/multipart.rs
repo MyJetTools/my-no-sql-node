@@ -7,7 +7,7 @@ pub async fn start_read_all(app: &AppContext, table_name: &str) -> Result<i64, D
 
     let db_table = super::table::get(app, table_name).await?;
 
-    let entities = db_table.get_all_as_vec_dequeue().await;
+    let entities = db_table.get_all_as_vec_dequeue();
 
     if entities.len() == 0 {
         return Ok(0);

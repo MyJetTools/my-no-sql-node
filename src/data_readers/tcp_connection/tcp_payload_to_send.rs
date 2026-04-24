@@ -6,7 +6,7 @@ use my_json::consts::EMPTY_ARRAY;
 pub async fn serialize(sync_event: &SyncEvent) -> Vec<MyNoSqlTcpContract> {
     match sync_event {
         SyncEvent::TableFirstInit(sync_data) => {
-            let table_snapshot = sync_data.db_table.get_table_snapshot().await;
+            let table_snapshot = sync_data.db_table.get_table_snapshot();
 
             let data = table_snapshot.as_json_array().build();
 
@@ -19,7 +19,7 @@ pub async fn serialize(sync_event: &SyncEvent) -> Vec<MyNoSqlTcpContract> {
         }
 
         SyncEvent::InitTable(sync_data) => {
-            let data = sync_data.db_table.get_table_as_json_array().await.build();
+            let data = sync_data.db_table.get_table_as_json_array().build();
 
             let result = MyNoSqlTcpContract::InitTable {
                 table_name: sync_data.db_table.name.to_string(),

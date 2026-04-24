@@ -20,7 +20,7 @@ pub struct TableContract {
 }
 
 impl TableContract {
-    pub async fn from_table_wrapper(table_wrapper: &DbTable) -> Self {
+    pub fn from_table_wrapper(table_wrapper: &DbTable) -> Self {
         Self {
             name: table_wrapper.name.to_string(),
         }
