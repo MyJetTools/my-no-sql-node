@@ -45,11 +45,9 @@ pub fn filter_it<'s, TItem>(
     limit: Option<usize>,
     skip: Option<usize>,
 ) -> Vec<&'s TItem> {
-    let mut result = if let Some(limit) = limit {
-        Vec::with_capacity(limit)
-    } else {
-        Vec::new()
-    };
+    // Not pre-allocated by `limit`: it comes from the request, and a huge one would make the
+    // allocation abort the whole process.
+    let mut result = Vec::new();
 
     let mut no = 0;
     let mut added = 0;

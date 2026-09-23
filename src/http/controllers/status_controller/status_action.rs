@@ -1,62 +1,32 @@
 use crate::app::AppContext;
 use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
+use rest_api_shared::StatusModel;
 use std::sync::Arc;
-
-use super::models::StatusModel;
 
 #[http_route(
     method: "GET",
-    route: "/Api/Status",
+    route: "/api/Status",
     controller: "Monitoring",
     description: "Monitoring API",
     summary: "Returns monitoring metrics",
     result:[
-        {status_code: 200, description: "Monitoring snapshot", model: "Vec<StatusModel>"},
+        {status_code: 200, description: "Monitoring snapshot", model: "StatusModel"},
     ]
 )]
-pub struct StatusController {
+pub struct StatusAction {
     app: Arc<AppContext>,
 }
 
-impl StatusController {
+impl StatusAction {
     pub fn new(app: Arc<AppContext>) -> Self {
         Self { app }
     }
 }
 
-/*
-#[async_trait::async_trait]
-impl GetAction for StatusController {
-    fn get_route(&self) -> &str {
-        "/Api/Status"
-    }
-
-    fn get_description(&self) -> Option<HttpActionDescription> {
-        HttpActionDescription {
-            controller_name: "Monitoring",
-            description: "Monitoring API",
-
-            input_params: None,
-            results: vec![
-                StatusModel::get_http_data_structure().into_http_result_object(
-                    200,
-                    false,
-                    "Monitoring result",
-                ),
-            ],
-        }
-        .into()
-    }
-
-
-}
- */
-
 async fn handle_request(
-    action: &StatusController,
+    action: &StatusAction,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let model = StatusModel::new(action.app.as_ref()).await;
-    HttpOutput::as_json(model).into_ok_result(true).into()
+    HttpOutput::as_json(super::models::build_status_model(action.app.as_ref())).into_ok_result(false)
 }

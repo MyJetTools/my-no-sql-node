@@ -9,13 +9,14 @@ use super::models::GetHighestRowsAndBelowInputContract;
 
 #[http_route(
     method: "GET",
-    route: "/Rows/HighestRowAndBelow",
+    route: "/api/Rows/HighestRowAndBelow",
+    deprecated_routes: ["/Rows/HighestRowAndBelow"],
     controller: "Rows",
     description: "Gets row with highest row_key and below",
     summary: "Returns row with highest row_key and below",
     input_data: "GetHighestRowsAndBelowInputContract",
     result:[
-        {status_code: 200, description: "Monitoring snapshot"},
+        {status_code: 200, description: "Rows"},
     ]
 )]
 pub struct GetHighestRowAndBelowAction {
@@ -31,31 +32,24 @@ impl GetHighestRowAndBelowAction {
 async fn handle_request(
     action: &GetHighestRowAndBelowAction,
     input_data: GetHighestRowsAndBelowInputContract,
-    _ctx: &mut HttpContext,
+    ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let db_table =
-        crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_ref())
-            .await?;
+    let namespace = crate::http::get_request_namespace(&action.app, ctx)?;
 
-    let limit = if let Some(max_amount) = input_data.max_amount {
-        if max_amount == 0 {
-            None
-        } else {
-            Some(max_amount)
-        }
-    } else {
-        None
-    };
+    let db_table =
+        crate::db_operations::read::get_table(&namespace, input_data.table_name.as_str())?;
+
+    // Zero is "no limit", the way the main node reads it.
+    let limit = input_data.max_amount.filter(|max_amount| *max_amount > 0);
 
     let result = crate::db_operations::read::get_highest_row_and_below(
-        &action.app,
-        db_table.as_ref(),
-        &input_data.partition_key,
+        &namespace,
+        &db_table,
+        input_data.partition_key.as_str(),
         &input_data.row_key,
         limit,
         input_data.get_update_statistics(),
-    )
-    .await?;
+    );
 
     Ok(result.into())
 }

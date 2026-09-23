@@ -6,8 +6,8 @@ pub struct DbTableMetrics {
     pub records_amount: usize,
 }
 
-pub async fn get_table_metrics(db_table_wrapper: &DbTable) -> DbTableMetrics {
-    let table_read_access = db_table_wrapper.data.read();
+pub fn get_table_metrics(db_table: &DbTable) -> DbTableMetrics {
+    let table_read_access = db_table.data.read();
 
     DbTableMetrics {
         table_size: table_read_access.get_table_size(),

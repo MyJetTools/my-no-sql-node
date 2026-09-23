@@ -1,76 +1,47 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use my_json::json_writer::{JsonArrayWriter, JsonNullValue, JsonObjectWriter};
-use my_no_sql_sdk::core::db::{DbRow, DbTableInner, DbTableName};
+use my_json::json_writer::{JsonArrayWriter, JsonObjectWriter};
+use my_no_sql_sdk::core::db::{DbRow, DbTableName};
 
 pub struct DeleteRowsEventSyncData {
     pub table_name: DbTableName,
-    pub deleted_partitions: Option<BTreeMap<String, ()>>,
-    pub deleted_rows: Option<BTreeMap<String, BTreeMap<String, Arc<DbRow>>>>,
+    /// Deleted rows by partition key, then by row key.
+    pub deleted_rows: BTreeMap<String, BTreeMap<String, Arc<DbRow>>>,
 }
 
 impl DeleteRowsEventSyncData {
-    pub fn new(db_table: &DbTableInner) -> Self {
+    pub fn new(table_name: DbTableName) -> Self {
         Self {
-            table_name: db_table.name.clone(),
-            deleted_partitions: None,
-            deleted_rows: None,
+            table_name,
+            deleted_rows: BTreeMap::new(),
         }
-    }
-
-    fn check_that_we_are_in_partition_mode(
-        &mut self,
-        partition_key: &str,
-    ) -> &mut BTreeMap<String, BTreeMap<String, Arc<DbRow>>> {
-        if let Some(deleted_partitions) = &self.deleted_partitions {
-            if deleted_partitions.contains_key(partition_key) {
-                panic!("Can not add deleted rows from partition {}", partition_key);
-            }
-        }
-
-        if self.deleted_rows.is_none() {
-            self.deleted_rows = Some(BTreeMap::new())
-        }
-
-        return self.deleted_rows.as_mut().unwrap();
     }
 
     pub fn add_deleted_row(&mut self, partition_key: &str, deleted_row: Arc<DbRow>) {
-        let deleted_rows_btree_map = self.check_that_we_are_in_partition_mode(partition_key);
-
-        if !deleted_rows_btree_map.contains_key(partition_key) {
-            deleted_rows_btree_map.insert(partition_key.to_string(), BTreeMap::new());
-        }
-
-        deleted_rows_btree_map
-            .get_mut(partition_key)
-            .unwrap()
-            .insert(deleted_row.get_row_key().to_string(), deleted_row.clone());
+        self.deleted_rows
+            .entry(partition_key.to_string())
+            .or_default()
+            .insert(deleted_row.get_row_key().to_string(), deleted_row);
     }
 
-    pub fn as_vec(&self) -> Vec<u8> {
+    pub fn has_data(&self) -> bool {
+        !self.deleted_rows.is_empty()
+    }
+
+    /// `{"partition_key": ["row_key", ...], ...}` - the shape an HTTP reader expects.
+    pub fn as_json(&self) -> JsonObjectWriter {
         let mut json_object_writer = JsonObjectWriter::new();
 
-        {
-            if let Some(deleted_partitions) = &self.deleted_partitions {
-                for partition_key in deleted_partitions.keys() {
-                    json_object_writer = json_object_writer.write(partition_key, JsonNullValue);
-                }
+        for (partition_key, deleted_rows) in &self.deleted_rows {
+            let mut row_keys = JsonArrayWriter::new();
+
+            for row_key in deleted_rows.keys() {
+                row_keys = row_keys.write(row_key.as_str());
             }
 
-            if let Some(deleted_rows) = &self.deleted_rows {
-                for (partition_key, deleted_rows) in deleted_rows {
-                    let mut deleted_rows_json_array = JsonArrayWriter::new();
-                    for deleted_row in deleted_rows.values() {
-                        deleted_rows_json_array =
-                            deleted_rows_json_array.write(deleted_row.get_row_key());
-                    }
-                    json_object_writer =
-                        json_object_writer.write(partition_key, deleted_rows_json_array);
-                }
-            }
+            json_object_writer = json_object_writer.write(partition_key, row_keys);
         }
 
-        json_object_writer.build().into_bytes()
+        json_object_writer
     }
 }

@@ -1,6 +1,5 @@
 mod count_action;
-pub mod models;
-mod row;
-
-pub use count_action::RowCountAction;
-pub use row::GetRowsAction;
+mod get_rows_action;
+mod models;
+pub use count_action::*;
+pub use get_rows_action::*;

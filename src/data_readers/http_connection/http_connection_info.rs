@@ -1,93 +1,78 @@
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use my_http_server::HttpFailResult;
-use my_no_sql_sdk::server::rust_extensions::date_time::{
+use my_no_sql_sdk::core::rust_extensions::date_time::{
     AtomicDateTimeAsMicroseconds, DateTimeAsMicroseconds,
 };
-use tokio::sync::Mutex;
+use parking_lot::Mutex;
 
-use crate::{
-    data_readers::http_connection::connection_delivery_info::HttpPayload, db_sync::SyncEvent,
-};
+use crate::db_sync::SyncEvent;
 
-use super::{into_http_payload, HttpConnectionDeliveryInfo};
+use super::{HttpConnectionDeliveryInfo, HttpPayload, NewRequestResult};
 
 pub struct HttpConnectionInfo {
-    pub id: String,
     pub ip: String,
     pub connected: DateTimeAsMicroseconds,
     pub last_incoming_moment: AtomicDateTimeAsMicroseconds,
-    pub delivery_info: Mutex<HttpConnectionDeliveryInfo>,
+    delivery_info: Mutex<HttpConnectionDeliveryInfo>,
     pending_to_send: AtomicUsize,
     name: Mutex<Option<String>>,
 }
 
 impl HttpConnectionInfo {
-    pub fn new(id: String, ip: String) -> Self {
+    pub fn new(ip: String) -> Self {
         Self {
-            id: id.to_string(),
             ip,
             connected: DateTimeAsMicroseconds::now(),
             last_incoming_moment: AtomicDateTimeAsMicroseconds::now(),
-            delivery_info: Mutex::new(HttpConnectionDeliveryInfo::new(id)),
+            delivery_info: Mutex::new(HttpConnectionDeliveryInfo::new()),
             pending_to_send: AtomicUsize::new(0),
             name: Mutex::new(None),
         }
     }
 
-    pub async fn get_name(&self) -> Option<String> {
-        let read_access = self.name.lock().await;
-        read_access.clone()
+    pub fn get_name(&self) -> Option<String> {
+        self.name.lock().clone()
     }
 
-    pub async fn set_name_as_reader(&self, name: String) {
-        let mut write_access = self.name.lock().await;
-        *write_access = Some(name);
+    pub fn set_name(&self, name: String) {
+        *self.name.lock() = Some(name);
     }
 
-    pub async fn ping(&self, now: DateTimeAsMicroseconds) {
-        let mut delivery_info = self.delivery_info.lock().await;
-        delivery_info.ping(now)
+    pub fn ping(&self, now: DateTimeAsMicroseconds) {
+        self.delivery_info.lock().ping(now);
     }
 
-    pub async fn send(&self, sync_event: &SyncEvent) {
-        if let Some(payload) = into_http_payload::convert(sync_event).await {
-            let mut delivery_info_write_access = self.delivery_info.lock().await;
-            delivery_info_write_access.upload(payload);
-            self.pending_to_send.store(
-                delivery_info_write_access.get_size(),
-                std::sync::atomic::Ordering::SeqCst,
-            );
+    pub fn send(&self, sync_event: &SyncEvent) {
+        // Compiled before the lock is taken - it is the heavy part.
+        let payload = super::compile_http_payload(sync_event);
 
-            if let Some(mut task) = delivery_info_write_access.get_task_to_write_response() {
-                let payload = delivery_info_write_access.get_payload_to_deliver().unwrap();
+        let mut delivery_info = self.delivery_info.lock();
+        delivery_info.upload(payload.as_slice());
 
-                if let Err(err) = task.try_set_ok(HttpPayload::Payload(payload)) {
-                    println!(
-                        "Sending payload Error for the session: {}. Reason:{:?}",
-                        self.id, err
-                    );
-                }
-            }
+        self.pending_to_send
+            .store(delivery_info.get_size(), Ordering::Relaxed);
+    }
+
+    /// Waits for the changes of the session. `None` means the session is gone - it was collected
+    /// after a period of silence.
+    pub async fn new_request(&self) -> Option<HttpPayload> {
+        let result = {
+            let mut delivery_info = self.delivery_info.lock();
+            let result = delivery_info.new_request(DateTimeAsMicroseconds::now());
+
+            self.pending_to_send
+                .store(delivery_info.get_size(), Ordering::Relaxed);
+
+            result
+        };
+
+        match result {
+            NewRequestResult::Payload(payload) => Some(HttpPayload::Payload(payload)),
+            NewRequestResult::Await(receiver) => receiver.await.ok(),
         }
     }
 
-    pub async fn new_request(&self) -> Result<HttpPayload, HttpFailResult> {
-        let task_completion = {
-            let mut write_access = self.delivery_info.lock().await;
-
-            if let Some(payload) = write_access.get_payload_to_deliver() {
-                return Ok(HttpPayload::Payload(payload));
-            }
-
-            write_access.issue_task_completion()
-        };
-
-        task_completion.get_result().await
-    }
-
     pub fn get_pending_to_send(&self) -> usize {
-        self.pending_to_send
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.pending_to_send.load(Ordering::Relaxed)
     }
 }

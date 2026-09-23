@@ -1,47 +1,37 @@
 use my_no_sql_sdk::{server::DbTable, tcp_contracts::sync_to_main::UpdateEntityStatisticsData};
 
-use crate::{app::AppContext, db_operations::DbOperationError};
+use crate::{db_operations::read::ReadOperationResult, namespaces::NodeNamespace};
 
-use super::super::ReadOperationResult;
-
-pub async fn get_all_by_partition_key(
-    app: &std::sync::Arc<AppContext>,
+pub fn get_all_by_partition_key(
+    namespace: &NodeNamespace,
     db_table: &DbTable,
-    partition_key: &String,
+    partition_key: &str,
     limit: Option<usize>,
     skip: Option<usize>,
     update_statistics: UpdateEntityStatisticsData,
-) -> Result<ReadOperationResult, DbOperationError> {
-    super::super::super::check_app_states(app)?;
+) -> ReadOperationResult {
+    let (json_array_writer, db_rows) = {
+        let table_inner = db_table.data.read();
 
-    let inner = db_table.data.read();
+        let Some(db_partition) = table_inner.get_partition(partition_key) else {
+            return ReadOperationResult::EmptyArray;
+        };
 
-    let db_partition = inner.get_partition(partition_key);
+        crate::db_operations::read::filter_and_compile_json(
+            db_partition.get_all_rows(),
+            limit,
+            skip,
+        )
+    };
 
-    if db_partition.is_none() {
-        return Ok(ReadOperationResult::EmptyArray);
+    if update_statistics.has_data_to_update() && !db_rows.is_empty() {
+        namespace.main_node.sync_to_main_node.update(
+            db_table.name.as_str(),
+            partition_key,
+            || db_rows.iter().map(|itm| itm.get_row_key()),
+            &update_statistics,
+        );
     }
 
-    let db_partition = db_partition.unwrap();
-
-    let (json_array_writer, db_rows) = super::super::read_filter::filter_and_compile_json(
-        db_partition.get_all_rows().into_iter(),
-        limit,
-        skip,
-    );
-
-    if update_statistics.has_data_to_update() {
-        if db_rows.len() > 0 {
-            app.sync_to_main_node.update(
-                db_table.name.as_str(),
-                partition_key,
-                || db_rows.iter().map(|itm| itm.get_row_key()),
-                &update_statistics,
-            );
-        }
-    }
-
-    return Ok(ReadOperationResult::RowsArray(
-        json_array_writer.build().into_bytes(),
-    ));
+    ReadOperationResult::RowsArray(json_array_writer.build().into_bytes())
 }

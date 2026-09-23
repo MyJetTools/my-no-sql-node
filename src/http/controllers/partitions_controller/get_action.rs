@@ -9,11 +9,11 @@ use std::{result::Result, sync::Arc};
     route: "/api/Partitions",
     deprecated_routes: ["/Partitions"],
     input_data: "GetPartitionsListContract",
-    description: "Get Partitions amount of selected table",
-    summary: "Returns Partitions amount of selected table",
+    description: "Get Partitions of selected table",
+    summary: "Returns Partitions of selected table",
     controller: "Partitions",
     result:[
-        {status_code: 200, description: "Partitions amount", model: "PartitionsHttpResult"},
+        {status_code: 200, description: "Partitions", model: "PartitionsHttpResult"},
         {status_code: 400, description: "Table not found"},
     ]
 )]
@@ -30,24 +30,23 @@ impl GetPartitionsAction {
 async fn handle_request(
     action: &GetPartitionsAction,
     input_data: GetPartitionsListContract,
-    _ctx: &HttpContext,
+    ctx: &HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let db_table =
-        crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_str())
-            .await?;
+    let namespace = crate::http::get_request_namespace(&action.app, ctx)?;
 
-    let result = crate::db_operations::read::partitions::get_partitions(
-        &action.app,
+    let db_table =
+        crate::db_operations::read::get_table(&namespace, input_data.table_name.as_str())?;
+
+    let partitions = crate::db_operations::read::partitions::get_partitions(
         &db_table,
         input_data.limit,
         input_data.skip,
-    )
-    .await?;
+    );
 
     let result = PartitionsHttpResult {
-        amount: result.0,
-        data: result.1,
+        amount: partitions.total_amount,
+        data: partitions.partition_keys,
     };
 
-    HttpOutput::as_json(result).into_ok_result(true).into()
+    HttpOutput::as_json(result).into_ok_result(true)
 }

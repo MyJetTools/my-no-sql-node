@@ -2,13 +2,14 @@ use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
 use std::sync::Arc;
 
-use crate::{app::AppContext, http::http_sessions::HttpSessionsSupport};
+use crate::app::AppContext;
 
 use super::models::PingInputModel;
 
 #[http_route(
     method: "POST",
-    route: "/DataReader/Ping",
+    route: "/api/DataReader/Ping",
+    deprecated_routes: ["/DataReader/Ping"],
     controller: "DataReader",
     summary: "Pings that subscriber is alive",
     description: "Pings that subscriber is alive",
@@ -32,10 +33,7 @@ async fn handle_request(
     input_data: PingInputModel,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    action
-        .app
-        .get_http_session(input_data.session_id.as_str())
-        .await?;
+    crate::http::get_http_session(&action.app, input_data.session_id.as_str())?;
 
-    HttpOutput::Empty.into_ok_result(true).into()
+    HttpOutput::Empty.into_ok_result(true)
 }

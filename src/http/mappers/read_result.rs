@@ -2,47 +2,23 @@ use my_http_server::{HttpOkResult, HttpOutput, WebContentType};
 
 use crate::db_operations::read::ReadOperationResult;
 
-impl Into<HttpOkResult> for ReadOperationResult {
-    fn into(self) -> HttpOkResult {
-        match self {
-            ReadOperationResult::SingleRow(content) => {
-                let output = HttpOutput::Content {
-                    status_code: 200,
-                    headers: WebContentType::Json.into(),
-                    content,
-                };
-
-                HttpOkResult {
-                    write_telemetry: true,
-                    output,
-                }
-            }
-            ReadOperationResult::RowsArray(content) => {
-                let output = HttpOutput::Content {
-                    status_code: 200,
-                    headers: WebContentType::Json.into(),
-                    content,
-                };
-
-                HttpOkResult {
-                    write_telemetry: true,
-                    output,
-                }
-            }
+impl From<ReadOperationResult> for HttpOkResult {
+    fn from(src: ReadOperationResult) -> Self {
+        let content = match src {
+            ReadOperationResult::SingleRow(content) => content,
+            ReadOperationResult::RowsArray(content) => content,
             ReadOperationResult::EmptyArray => {
-                let empty_array = vec![my_json::consts::OPEN_ARRAY, my_json::consts::CLOSE_ARRAY];
-
-                let output = HttpOutput::Content {
-                    status_code: 200,
-                    headers: WebContentType::Json.into(),
-                    content: empty_array,
-                };
-
-                HttpOkResult {
-                    write_telemetry: true,
-                    output,
-                }
+                vec![my_json::consts::OPEN_ARRAY, my_json::consts::CLOSE_ARRAY]
             }
+        };
+
+        HttpOkResult {
+            write_telemetry: true,
+            output: HttpOutput::Content {
+                status_code: 200,
+                headers: WebContentType::Json.into(),
+                content,
+            },
         }
     }
 }

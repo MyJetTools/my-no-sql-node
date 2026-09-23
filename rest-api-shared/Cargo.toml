@@ -1,0 +1,14 @@
+[package]
+name = "rest-api-shared"
+version = "0.1.0"
+edition = "2021"
+
+# Wire models of the node's HTTP api, shared verbatim by the node (with the "server" feature) and
+# its web UI (without it). Depends on my-http-utils only, so it stays wasm-clean.
+
+[features]
+server = ["my-http-utils/server"]
+
+[dependencies]
+my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git" }
+serde = { version = "*", features = ["derive"] }

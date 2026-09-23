@@ -1,5 +1,5 @@
 use my_http_server::macros::*;
-use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
+use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
 use std::sync::Arc;
 
 use crate::app::AppContext;
@@ -22,9 +22,8 @@ async fn handle_request(
     action: &MetricsAction,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let result = action.app.metrics.build();
-
     HttpOutput::from_builder()
-        .set_content(result.into_bytes())
+        .set_content_type(WebContentType::Text)
+        .set_content(action.app.metrics.build().into_bytes())
         .into_ok_result(false)
 }

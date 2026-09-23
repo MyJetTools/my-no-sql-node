@@ -1,121 +1,45 @@
-use crate::db_operations::DbOperationError;
-
 use my_http_server::{HttpFailResult, HttpOutput, WebContentType};
+
+use crate::db_operations::DbOperationError;
 
 use super::{OperationFailHttpContract, OperationFailReason};
 
-pub const OPERATION_FAIL_HTTP_STATUS_CODE: u16 = 400;
+/// Status code of an operation failure described by `OperationFailHttpContract` - the one the
+/// main node answers with, and the one the SDK parses the contract of.
+const OPERATION_FAIL_HTTP_STATUS_CODE: u16 = 400;
 
 impl From<DbOperationError> for HttpFailResult {
     fn from(src: DbOperationError) -> Self {
         match src {
-            DbOperationError::TableAlreadyExists => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::TableAlreadyExists,
-                    message: format!("Table already exists"),
-                };
-                let content = serde_json::to_vec(&err_model).unwrap();
-
-                HttpOutput::Content {
-                    headers: WebContentType::Json.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(true, true)
-            }
-            DbOperationError::TableNotFound(table_name) => {
-                super::super::get_table::table_not_found_http_result(table_name.as_str())
-            }
+            DbOperationError::TableNotFound(table_name) => operation_fail(
+                OperationFailReason::TableNotFound,
+                format!("Table '{}' not found", table_name),
+            ),
+            DbOperationError::NamespaceNotFound(namespace) => operation_fail(
+                OperationFailReason::NamespaceNotFound,
+                format!("Namespace '{}' not found", namespace),
+            ),
+            DbOperationError::NamespaceNameValidationError(reason) => operation_fail(
+                OperationFailReason::RequiredEntityFieldIsMissing,
+                format!("Invalid namespace name: {}", reason),
+            ),
             DbOperationError::RecordNotFound => HttpOutput::Content {
-                headers: WebContentType::Json.into(),
+                headers: WebContentType::Text.into(),
                 status_code: 404,
-                content: format!("Record not found").into_bytes(),
+                content: b"Record not found".to_vec(),
             }
             .into_http_fail_result(false, false),
-            DbOperationError::ApplicationIsNotInitializedYet => HttpOutput::Content {
-                headers: WebContentType::Json.into(),
-                status_code: 503,
-                content: format!("Application is not initialized yet").into_bytes(),
-            }
-            .into_http_fail_result(false, false),
-            DbOperationError::OptimisticConcurencyUpdateFails => HttpOutput::Content {
-                headers: WebContentType::Json.into(),
-                status_code: 409,
-                content: format!("Record is changed").into_bytes(),
-            }
-            .into_http_fail_result(false, false),
-            DbOperationError::RecordAlreadyExists => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::RecordAlreadyExists,
-                    message: format!("Record already exists"),
-                };
-                let content = serde_json::to_vec(&err_model).unwrap();
-
-                HttpOutput::Content {
-                    headers: WebContentType::Json.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(false, false)
-            }
-            DbOperationError::TimeStampFieldRequires => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::RequieredEntityFieldIsMissing,
-                    message: format!("Timestamp field requires"),
-                };
-
-                let content = serde_json::to_vec(&err_model).unwrap();
-                HttpOutput::Content {
-                    headers: WebContentType::Text.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(true, true)
-            }
-            DbOperationError::TableNameValidationError(reason) => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::RequieredEntityFieldIsMissing,
-                    message: format!("Invalid table name: {}", reason),
-                };
-
-                let content = serde_json::to_vec(&err_model).unwrap();
-                HttpOutput::Content {
-                    headers: WebContentType::Text.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(true, true)
-            }
-            DbOperationError::DbEntityParseFail(src) => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::JsonParseFail,
-                    message: format!("{:?}", src),
-                };
-
-                let content = serde_json::to_vec(&err_model).unwrap();
-
-                HttpOutput::Content {
-                    headers: WebContentType::Json.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(true, true)
-            }
-            DbOperationError::NoConnectionToMainNode => {
-                let err_model = OperationFailHttpContract {
-                    reason: OperationFailReason::JsonParseFail,
-                    message: format!("{:?}", src),
-                };
-
-                let content = serde_json::to_vec(&err_model).unwrap();
-
-                HttpOutput::Content {
-                    headers: WebContentType::Json.into(),
-                    status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
-                    content,
-                }
-                .into_http_fail_result(true, true)
-            }
         }
     }
+}
+
+fn operation_fail(reason: OperationFailReason, message: String) -> HttpFailResult {
+    let content = serde_json::to_vec(&OperationFailHttpContract { reason, message }).unwrap();
+
+    HttpOutput::Content {
+        headers: WebContentType::Json.into(),
+        status_code: OPERATION_FAIL_HTTP_STATUS_CODE,
+        content,
+    }
+    .into_http_fail_result(false, false)
 }

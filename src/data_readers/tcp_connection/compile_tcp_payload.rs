@@ -3,99 +3,74 @@ use my_no_sql_sdk::tcp_contracts::{DeleteRowTcpContract, MyNoSqlTcpContract};
 use crate::db_sync::SyncEvent;
 use my_json::consts::EMPTY_ARRAY;
 
-pub async fn serialize(sync_event: &SyncEvent) -> Vec<MyNoSqlTcpContract> {
+/// Serializes a change into the packets a TCP reader receives.
+pub fn compile_tcp_payload(sync_event: &SyncEvent) -> Vec<MyNoSqlTcpContract> {
     match sync_event {
         SyncEvent::TableFirstInit(sync_data) => {
-            let table_snapshot = sync_data.db_table.get_table_snapshot();
-
-            let data = table_snapshot.as_json_array().build();
-
-            let tcp_contract = MyNoSqlTcpContract::InitTable {
+            vec![MyNoSqlTcpContract::InitTable {
                 table_name: sync_data.db_table.name.to_string(),
-                data: data.into_bytes(),
-            };
-
-            vec![tcp_contract]
+                data: sync_data
+                    .db_table
+                    .get_table_as_json_array()
+                    .build()
+                    .into_bytes(),
+            }]
         }
 
         SyncEvent::InitTable(sync_data) => {
-            let data = sync_data.db_table.get_table_as_json_array().build();
-
-            let result = MyNoSqlTcpContract::InitTable {
+            vec![MyNoSqlTcpContract::InitTable {
                 table_name: sync_data.db_table.name.to_string(),
-                data: data.into_bytes(),
-            };
-
-            vec![result]
+                data: sync_data
+                    .db_table
+                    .get_table_as_json_array()
+                    .build()
+                    .into_bytes(),
+            }]
         }
-        SyncEvent::InitPartitions(data) => {
-            let mut result = Vec::new();
 
-            for (partition_key, snapshot) in &data.partitions_to_update {
-                let contract = MyNoSqlTcpContract::InitPartition {
+        SyncEvent::InitPartitions(sync_data) => sync_data
+            .partitions_to_update
+            .iter()
+            .map(
+                |(partition_key, snapshot)| MyNoSqlTcpContract::InitPartition {
                     partition_key: partition_key.to_string(),
-                    table_name: data.table_name.to_string(),
-                    data: if let Some(db_partition_snapshot) = snapshot {
-                        db_partition_snapshot
+                    table_name: sync_data.table_name.to_string(),
+                    data: match snapshot {
+                        Some(db_partition_snapshot) => db_partition_snapshot
                             .db_rows_snapshot
                             .as_json_array()
                             .build()
-                            .into_bytes()
-                    } else {
-                        EMPTY_ARRAY.to_vec()
+                            .into_bytes(),
+                        None => EMPTY_ARRAY.to_vec(),
                     },
-                };
+                },
+            )
+            .collect(),
 
-                result.push(contract);
-            }
-
-            result
+        SyncEvent::UpdateRows(sync_data) => {
+            vec![MyNoSqlTcpContract::UpdateRows {
+                table_name: sync_data.table_name.to_string(),
+                data: sync_data
+                    .rows_by_partition
+                    .as_json_array()
+                    .build()
+                    .into_bytes(),
+            }]
         }
-        SyncEvent::UpdateRows(data) => {
-            let result = MyNoSqlTcpContract::UpdateRows {
-                table_name: data.table_name.to_string(),
-                data: data.rows_by_partition.as_json_array().build().into_bytes(),
-            };
-            vec![result]
-        }
-        SyncEvent::DeleteRows(data) => {
-            let mut result = Vec::new();
 
-            if let Some(deleted_partitions) = &data.deleted_partitions {
-                for (partition_key, _) in deleted_partitions {
-                    let contract = MyNoSqlTcpContract::InitPartition {
-                        table_name: data.table_name.to_string(),
+        SyncEvent::DeleteRows(sync_data) => sync_data
+            .deleted_rows
+            .iter()
+            .map(|(partition_key, rows)| MyNoSqlTcpContract::DeleteRows {
+                table_name: sync_data.table_name.to_string(),
+                rows: rows
+                    .keys()
+                    .map(|row_key| DeleteRowTcpContract {
                         partition_key: partition_key.to_string(),
-                        data: EMPTY_ARRAY.to_vec(),
-                    };
-
-                    result.push(contract);
-                }
-            }
-
-            if let Some(deleted_rows) = &data.deleted_rows {
-                for (partition_key, rows) in deleted_rows {
-                    let mut deleted_rows = Vec::new();
-
-                    for row_key in rows.keys() {
-                        let contract = DeleteRowTcpContract {
-                            partition_key: partition_key.to_string(),
-                            row_key: row_key.to_string(),
-                        };
-
-                        deleted_rows.push(contract);
-                    }
-
-                    let contract = MyNoSqlTcpContract::DeleteRows {
-                        table_name: data.table_name.to_string(),
-                        rows: deleted_rows,
-                    };
-
-                    result.push(contract);
-                }
-            }
-
-            result
-        }
+                        row_key: row_key.to_string(),
+                    })
+                    .collect(),
+            })
+            .collect(),
     }
 }

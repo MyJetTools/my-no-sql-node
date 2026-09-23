@@ -4,14 +4,16 @@ use std::sync::Arc;
 
 use crate::app::AppContext;
 
-use super::models::TableContract;
+use super::models::{GetTablesListContract, TableContract};
 
 #[http_route(
     method: "GET",
-    route: "/Tables/List",
+    route: "/api/Tables/List",
+    deprecated_routes: ["/Tables/List"],
     description: "Get List of Tables",
-    summary: "Returns List of Tables",
+    summary: "Returns the tables of the namespace this node replicates",
     controller: "Tables",
+    input_data: "GetTablesListContract",
     result:[
         {status_code: 200, description: "List of tables", model: "Vec<TableContract>"},
     ]
@@ -28,16 +30,19 @@ impl GetListAction {
 
 async fn handle_request(
     action: &GetListAction,
-    _ctx: &mut HttpContext,
+    _input_data: GetTablesListContract,
+    ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    crate::db_operations::check_app_states(action.app.as_ref())?;
-    let tables = action.app.db.get_tables();
+    let namespace = crate::http::get_request_namespace(&action.app, ctx)?;
 
-    let mut response: Vec<TableContract> = vec![];
+    let response: Vec<TableContract> = namespace
+        .db
+        .get_tables()
+        .iter()
+        .map(|db_table| TableContract {
+            name: db_table.name.to_string(),
+        })
+        .collect();
 
-    for db_table in tables.iter() {
-        response.push(TableContract::from_table_wrapper(db_table.as_ref()));
-    }
-
-    HttpOutput::as_json(response).into_ok_result(true).into()
+    HttpOutput::as_json(response).into_ok_result(true)
 }

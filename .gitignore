@@ -1,6 +1,6 @@
-/target
+**/target
 /node_modules
 .idea
 .DS_Store
 .vscode
-Cargo.lock
+**/Cargo.lock

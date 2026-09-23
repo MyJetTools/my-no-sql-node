@@ -6,16 +6,15 @@ use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput, WebC
 
 use crate::{
     app::AppContext,
-    data_readers::{http_connection::HttpPayload, DataReaderConnection},
-    db_operations::DbOperationError,
-    http::http_sessions::HttpSessionsSupport,
+    data_readers::{DataReader, DataReaderConnection, HttpPayload},
 };
 
-use super::models::{GetChangesInputModel, UpdateExpirationDateTime};
+use super::models::{GetChangesInputModel, UpdateExpirationDateTimeByTable};
 
 #[http_route(
     method: "POST",
-    route: "/DataReader/GetChanges",
+    route: "/api/DataReader/GetChanges",
+    deprecated_routes: ["/DataReader/GetChanges"],
     controller: "DataReader",
     description: "Get Subscriber changes",
     summary: "Returns Subscriber changes",
@@ -39,96 +38,75 @@ async fn handle_request(
     input_data: GetChangesInputModel,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let data_reader = action
-        .app
-        .get_http_session(input_data.session_id.as_str())
-        .await?;
+    let data_reader = crate::http::get_http_session(&action.app, input_data.session_id.as_str())?;
 
     let body_data = input_data.body.deserialize_json()?;
-    for update_model in &body_data.update_expiration_time {
-        update_expiration_time(
-            action.app.as_ref(),
-            update_model.table_name.as_str(),
-            &update_model.items,
-        )
-        .await?;
+
+    for update_model in body_data.update_expiration_time.iter() {
+        update_expiration_time(action.app.as_ref(), data_reader.as_ref(), update_model);
     }
 
-    if let DataReaderConnection::Http(info) = &data_reader.connection {
-        let result = info.new_request().await?;
-        match result {
-            HttpPayload::Ping => return HttpOutput::Empty.into_ok_result(false).into(),
-            HttpPayload::Payload(payload) => {
-                return HttpOutput::Content {
-                    status_code: 200,
-                    headers: Default::default(),
-                    content: payload,
-                }
-                .into_ok_result(false)
-                .into();
-            }
+    let DataReaderConnection::Http(info) = &data_reader.connection else {
+        return HttpOutput::Content {
+            status_code: 400,
+            headers: WebContentType::Text.into(),
+            content: b"Only HTTP sessions are supported".to_vec(),
         }
-    }
+        .into_err(false, false);
+    };
 
-    HttpOutput::Content {
-        status_code: 400,
-        headers: WebContentType::Text.into(),
-        content: "Only HTTP sessions are supported".to_string().into_bytes(),
+    match info.new_request().await {
+        Some(HttpPayload::Ping) => HttpOutput::Empty.into_ok_result(false),
+        Some(HttpPayload::Payload(payload)) => HttpOutput::Content {
+            status_code: 200,
+            headers: Default::default(),
+            content: payload,
+        }
+        .into_ok_result(false),
+        None => Err(crate::http::session_not_found()),
     }
-    .into_err(true, true)
 }
 
-async fn update_expiration_time(
+fn update_expiration_time(
     app: &AppContext,
-    table_name: &str,
-    items: &[UpdateExpirationDateTime],
-) -> Result<(), DbOperationError> {
-    let db_table = app.db.get_table(table_name);
-    if db_table.is_none() {
-        return Ok(());
+    data_reader: &DataReader,
+    update_model: &UpdateExpirationDateTimeByTable,
+) {
+    let Some(namespace) = app.namespaces.get(data_reader.get_namespace().as_str()) else {
+        return;
+    };
+
+    if namespace
+        .db
+        .get_table(update_model.table_name.as_str())
+        .is_none()
+    {
+        return;
     }
 
-    for item in items {
-        if let Some(set_expiration_time) = item.get_db_partition_expiration_time() {
-            app.sync_to_main_node
-                .update(
-                    table_name,
-                    &item.partition_key,
-                    || item.row_keys.iter().map(|itm| itm.as_str()),
-                    &UpdateEntityStatisticsData {
-                        partition_last_read_moment: false,
-                        row_last_read_moment: false,
-                        partition_expiration_moment: Some(Some(set_expiration_time)),
-                        row_expiration_moment: None,
-                    },
-                );
-
-            /*
-            app.sync_to_main_node
-                .event_notifier
-                .update_partition_expiration_time(
-                    table_name,
-                    &item.partition_key,
-                    set_expiration_time,
-                );
-             */
+    for item in update_model.items.iter() {
+        if let Some(expiration_time) = item.get_db_partition_expiration_time() {
+            namespace.main_node.sync_to_main_node.update(
+                update_model.table_name.as_str(),
+                item.partition_key.as_str(),
+                || item.row_keys.iter().map(|itm| itm.as_str()),
+                &UpdateEntityStatisticsData {
+                    partition_expiration_moment: Some(Some(expiration_time)),
+                    ..Default::default()
+                },
+            );
         }
 
-        if let Some(set_expiration_time) = item.get_db_rows_expiration_time() {
-            app.sync_to_main_node
-                .update(
-                    table_name,
-                    &item.partition_key,
-                    || item.row_keys.iter().map(|itm| itm.as_str()),
-                    &UpdateEntityStatisticsData {
-                        partition_last_read_moment: false,
-                        row_last_read_moment: false,
-                        partition_expiration_moment: None,
-                        row_expiration_moment: Some(Some(set_expiration_time)),
-                    },
-                );
+        if let Some(expiration_time) = item.get_db_rows_expiration_time() {
+            namespace.main_node.sync_to_main_node.update(
+                update_model.table_name.as_str(),
+                item.partition_key.as_str(),
+                || item.row_keys.iter().map(|itm| itm.as_str()),
+                &UpdateEntityStatisticsData {
+                    row_expiration_moment: Some(Some(expiration_time)),
+                    ..Default::default()
+                },
+            );
         }
     }
-
-    Ok(())
 }

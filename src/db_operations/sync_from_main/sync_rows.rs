@@ -1,29 +1,39 @@
-use std::sync::Arc;
-
-use my_no_sql_sdk::core::db::PartitionKey;
+use my_no_sql_sdk::core::{db::PartitionKey, db_json_entity::DbJsonEntity};
 
 use crate::{
     app::AppContext,
-    db_sync::{states::UpdateRowsSyncData, SyncEvent},
+    db_sync::{SyncEvent, UpdateRowsSyncData},
+    namespaces::NodeNamespace,
 };
 
-pub async fn sync_rows(app: &Arc<AppContext>, table_name: String, data: Vec<u8>) {
-    let db_table = super::get_or_add_table(app, table_name.as_str()).await;
+pub fn sync_rows(app: &AppContext, namespace: &NodeNamespace, table_name: String, data: Vec<u8>) {
+    let entities = match DbJsonEntity::restore_grouped_by_partition_key(data.as_slice()) {
+        Ok(entities) => entities,
+        Err(err) => {
+            super::report_broken_payload("UpdateRows", namespace, table_name.as_str(), &err);
+            return;
+        }
+    };
 
-    let entities =
-        crate::db_operations::parse_json_entity::restore_as_btree_map(data.as_slice()).unwrap();
+    let Some(db_table) = namespace.db.get_table(table_name.as_str()) else {
+        return;
+    };
 
-    let mut table_data = db_table.data.write();
+    let mut sync_data = UpdateRowsSyncData::new(db_table.name.clone());
 
-    let mut sync_data = UpdateRowsSyncData::new(&table_data);
+    {
+        let mut table_data = db_table.data.write();
 
-    for (partition_key, db_rows) in entities {
-        table_data.bulk_insert_or_replace(&partition_key, &db_rows);
+        for (partition_key, db_rows) in entities {
+            table_data.bulk_insert_or_replace(&partition_key, &db_rows);
 
-        let partition_key = PartitionKey::new(partition_key);
-
-        sync_data.rows_by_partition.add_rows(partition_key, db_rows);
+            sync_data
+                .rows_by_partition
+                .add_rows(PartitionKey::new(partition_key), db_rows);
+        }
     }
 
-    app.dispatch(SyncEvent::UpdateRows(sync_data));
+    if sync_data.rows_by_partition.has_elements() {
+        app.dispatch(namespace.name.clone(), SyncEvent::UpdateRows(sync_data));
+    }
 }

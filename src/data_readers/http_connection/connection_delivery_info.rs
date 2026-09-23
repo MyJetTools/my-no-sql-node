@@ -1,113 +1,196 @@
-use std::{collections::VecDeque, time::Duration};
+use std::time::Duration;
 
-use my_http_server::HttpFailResult;
-use my_no_sql_sdk::server::rust_extensions::{
-    date_time::DateTimeAsMicroseconds, TaskCompletion, TaskCompletionAwaiter,
-};
+use my_no_sql_sdk::core::rust_extensions::date_time::DateTimeAsMicroseconds;
+use tokio::sync::oneshot;
 
 pub enum HttpPayload {
     Ping,
     Payload(Vec<u8>),
 }
 
-pub struct AwaitingResponse {
-    pub created: DateTimeAsMicroseconds,
-    task_completion: TaskCompletion<HttpPayload, HttpFailResult>,
+pub enum NewRequestResult {
+    Payload(Vec<u8>),
+    Await(oneshot::Receiver<HttpPayload>),
 }
 
+struct AwaitingResponse {
+    created: DateTimeAsMicroseconds,
+    sender: oneshot::Sender<HttpPayload>,
+}
+
+/// A GetChanges request which waited this long without changes is answered with a Ping.
+const MAX_AWAITING_DURATION: Duration = Duration::from_secs(3);
+
+/// Long polling of an HTTP reader: the changes accumulated for it, and the GetChanges request
+/// waiting for them, if there is one.
 pub struct HttpConnectionDeliveryInfo {
     awaiting_response: Option<AwaitingResponse>,
-    payload_to_deliver: VecDeque<Vec<u8>>,
-    id: String,
+    payload_to_deliver: Vec<u8>,
 }
-static MIN_PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 impl HttpConnectionDeliveryInfo {
-    pub fn new(id: String) -> Self {
+    pub fn new() -> Self {
         Self {
             awaiting_response: None,
-            payload_to_deliver: VecDeque::new(),
-            id,
+            payload_to_deliver: Vec::new(),
         }
-    }
-
-    pub fn upload(&mut self, payload: Vec<u8>) {
-        match self.payload_to_deliver.pop_back() {
-            Some(mut last_one) => {
-                last_one.extend(payload);
-                self.payload_to_deliver.push_back(last_one);
-            }
-            None => {
-                self.payload_to_deliver.push_back(payload);
-            }
-        }
-    }
-
-    pub fn get_payload_to_deliver(&mut self) -> Option<Vec<u8>> {
-        self.payload_to_deliver.pop_front()
-    }
-
-    pub fn ping(&mut self, now: DateTimeAsMicroseconds) {
-        let ping_me = if let Some(item) = &self.awaiting_response {
-            now.duration_since(item.created).as_positive_or_zero() >= MIN_PING_TIMEOUT
-        } else {
-            false
-        };
-
-        if !ping_me {
-            return;
-        }
-
-        if let Some(mut task) = self.get_task_to_write_response() {
-            if let Err(err) = task.try_set_ok(HttpPayload::Ping) {
-                println!(
-                    "Could not set ping result to http connection {}. Err:{:?}",
-                    self.id, err
-                );
-            }
-        }
-    }
-
-    pub fn get_task_to_write_response(
-        &mut self,
-    ) -> Option<TaskCompletion<HttpPayload, HttpFailResult>> {
-        if self.awaiting_response.is_none() {
-            return None;
-        }
-
-        let mut result = None;
-        std::mem::swap(&mut self.awaiting_response, &mut result);
-        let result = result?;
-
-        result.task_completion.into()
-    }
-
-    pub fn issue_task_completion(&mut self) -> TaskCompletionAwaiter<HttpPayload, HttpFailResult> {
-        if self.awaiting_response.is_some() {
-            panic!("Task completion is already issued");
-        }
-
-        let mut task_completion = TaskCompletion::new();
-
-        let result = task_completion.get_awaiter();
-
-        let awaiting_response = AwaitingResponse {
-            created: DateTimeAsMicroseconds::now(),
-            task_completion,
-        };
-
-        self.awaiting_response = Some(awaiting_response);
-
-        result
     }
 
     pub fn get_size(&self) -> usize {
-        let mut result = 0;
+        self.payload_to_deliver.len()
+    }
 
-        for delivery_info in &self.payload_to_deliver {
-            result += delivery_info.len();
+    /// Accumulates the changes and hands everything accumulated to the waiting request, if any.
+    pub fn upload(&mut self, payload: &[u8]) {
+        self.payload_to_deliver.extend_from_slice(payload);
+
+        let Some(awaiting_response) = self.awaiting_response.take() else {
+            return;
+        };
+
+        let payload = std::mem::take(&mut self.payload_to_deliver);
+
+        // The request is gone - its client stopped waiting. The changes stay for the next one.
+        if let Err(HttpPayload::Payload(payload)) =
+            awaiting_response.sender.send(HttpPayload::Payload(payload))
+        {
+            self.payload_to_deliver = payload;
+        }
+    }
+
+    /// Gives a new GetChanges request what has been accumulated, or makes it the request which
+    /// waits for the changes. Only the latest request of a session waits: the one which was
+    /// waiting before is answered with a Ping.
+    pub fn new_request(&mut self, now: DateTimeAsMicroseconds) -> NewRequestResult {
+        if !self.payload_to_deliver.is_empty() {
+            return NewRequestResult::Payload(std::mem::take(&mut self.payload_to_deliver));
         }
 
-        result
+        if let Some(previous) = self.awaiting_response.take() {
+            let _ = previous.sender.send(HttpPayload::Ping);
+        }
+
+        let (sender, receiver) = oneshot::channel();
+
+        self.awaiting_response = Some(AwaitingResponse {
+            created: now,
+            sender,
+        });
+
+        NewRequestResult::Await(receiver)
+    }
+
+    /// Answers the request which waited long enough with a Ping, so it is not cut off by a proxy
+    /// or by the client's own timeout.
+    pub fn ping(&mut self, now: DateTimeAsMicroseconds) {
+        let waited_long_enough = match &self.awaiting_response {
+            Some(awaiting_response) => {
+                now.duration_since(awaiting_response.created)
+                    .as_positive_or_zero()
+                    >= MAX_AWAITING_DURATION
+            }
+            None => false,
+        };
+
+        if !waited_long_enough {
+            return;
+        }
+
+        if let Some(awaiting_response) = self.awaiting_response.take() {
+            let _ = awaiting_response.sender.send(HttpPayload::Ping);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use my_no_sql_sdk::core::rust_extensions::date_time::DateTimeAsMicroseconds;
+
+    use super::{HttpConnectionDeliveryInfo, HttpPayload, NewRequestResult};
+
+    fn unwrap_payload(payload: HttpPayload) -> Vec<u8> {
+        match payload {
+            HttpPayload::Payload(payload) => payload,
+            HttpPayload::Ping => panic!("Payload is expected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_accumulated_changes_are_given_to_the_next_request() {
+        let mut delivery_info = HttpConnectionDeliveryInfo::new();
+
+        delivery_info.upload(&[1, 2]);
+        delivery_info.upload(&[3]);
+
+        match delivery_info.new_request(DateTimeAsMicroseconds::now()) {
+            NewRequestResult::Payload(payload) => assert_eq!(vec![1, 2, 3], payload),
+            NewRequestResult::Await(_) => panic!("Payload is expected"),
+        }
+
+        assert_eq!(0, delivery_info.get_size());
+    }
+
+    #[tokio::test]
+    async fn test_waiting_request_gets_the_changes() {
+        let mut delivery_info = HttpConnectionDeliveryInfo::new();
+
+        let NewRequestResult::Await(receiver) =
+            delivery_info.new_request(DateTimeAsMicroseconds::now())
+        else {
+            panic!("The request has to wait");
+        };
+
+        delivery_info.upload(&[1, 2, 3]);
+
+        assert_eq!(vec![1, 2, 3], unwrap_payload(receiver.await.unwrap()));
+        assert_eq!(0, delivery_info.get_size());
+    }
+
+    #[tokio::test]
+    async fn test_changes_are_kept_when_the_waiting_request_is_gone() {
+        let mut delivery_info = HttpConnectionDeliveryInfo::new();
+
+        let receiver = delivery_info.new_request(DateTimeAsMicroseconds::now());
+        drop(receiver);
+
+        delivery_info.upload(&[1, 2, 3]);
+
+        assert_eq!(3, delivery_info.get_size());
+    }
+
+    #[tokio::test]
+    async fn test_previous_request_is_answered_with_ping() {
+        let mut delivery_info = HttpConnectionDeliveryInfo::new();
+
+        let NewRequestResult::Await(first) =
+            delivery_info.new_request(DateTimeAsMicroseconds::now())
+        else {
+            panic!("The request has to wait");
+        };
+
+        let _second = delivery_info.new_request(DateTimeAsMicroseconds::now());
+
+        assert!(matches!(first.await.unwrap(), HttpPayload::Ping));
+    }
+
+    #[tokio::test]
+    async fn test_request_which_waited_long_enough_is_pinged() {
+        let mut delivery_info = HttpConnectionDeliveryInfo::new();
+
+        let created = DateTimeAsMicroseconds::now();
+
+        let NewRequestResult::Await(receiver) = delivery_info.new_request(created) else {
+            panic!("The request has to wait");
+        };
+
+        delivery_info.ping(created.add(Duration::from_secs(1)));
+        assert!(delivery_info.awaiting_response.is_some());
+
+        delivery_info.ping(created.add(Duration::from_secs(4)));
+        assert!(delivery_info.awaiting_response.is_none());
+
+        assert!(matches!(receiver.await.unwrap(), HttpPayload::Ping));
     }
 }

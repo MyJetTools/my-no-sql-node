@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_no_sql_sdk::server::rust_extensions::MyTimerTick;
+use my_no_sql_sdk::core::rust_extensions::{MyTimerTick, RepeatTimerIteration};
 
 use crate::app::AppContext;
 
@@ -16,24 +16,33 @@ impl MetricsUpdater {
 
 #[async_trait::async_trait]
 impl MyTimerTick for MetricsUpdater {
-    async fn tick(&self) {
-        let tables = self.app.db.get_tables();
+    async fn tick(&self) -> RepeatTimerIteration {
+        for namespace in self.app.namespaces.get_all().iter() {
+            namespace.main_node.one_second_tick();
 
-        for db_table in tables.iter() {
-            let table_metrics = crate::operations::get_table_metrics(db_table.as_ref()).await;
+            self.app.metrics.update_main_node_connection(
+                namespace.name.as_str(),
+                namespace.main_node.is_connected(),
+                namespace.main_node.get_ping_micros(),
+            );
 
-            self.app
-                .metrics
-                .update_table_metrics(db_table.name.as_str(), &table_metrics);
+            for db_table in namespace.db.get_tables().iter() {
+                let table_metrics = crate::operations::get_table_metrics(db_table.as_ref());
+
+                self.app.metrics.update_table_metrics(
+                    namespace.name.as_str(),
+                    db_table.name.as_str(),
+                    &table_metrics,
+                );
+            }
         }
 
-        for reader in self.app.data_readers.get_all().await {
-            self.app
-                .metrics
-                .update_pending_to_sync(&reader.connection)
-                .await;
+        for reader in self.app.data_readers.get_all() {
+            self.app.metrics.update_pending_to_sync(&reader.connection);
 
-            reader.connection.one_sec_tick().await;
+            reader.connection.one_sec_tick();
         }
+
+        RepeatTimerIteration::WithInterval
     }
 }

@@ -8,7 +8,8 @@ use super::models::RowsCountInputContract;
 
 #[http_route(
     method: "GET",
-    route: "/Count",
+    route: "/api/Count",
+    deprecated_routes: ["/Count"],
     controller: "Row",
     description: "Get Rows Count",
     summary: "Returns Rows Count",
@@ -30,37 +31,24 @@ impl RowCountAction {
 async fn handle_request(
     action: &RowCountAction,
     input_data: RowsCountInputContract,
-    _ctx: &mut HttpContext,
+    ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let db_table =
-        crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_str())
-            .await?;
+    let namespace = crate::http::get_request_namespace(&action.app, ctx)?;
 
-    if let Some(partition_key) = input_data.partition_key {
+    let db_table =
+        crate::db_operations::read::get_table(&namespace, input_data.table_name.as_str())?;
+
+    let rows_count = {
         let table_access = db_table.data.read();
 
-        let partition = table_access.get_partition(partition_key.as_str());
-
-        if let Some(partition) = partition {
-            return HttpOutput::as_text(partition.rows_count().to_string())
-                .into_ok_result(true)
-                .into();
-        } else {
-            return HttpOutput::as_text("0".to_string())
-                .into_ok_result(true)
-                .into();
+        match input_data.partition_key.as_ref() {
+            Some(partition_key) => table_access
+                .get_partition(partition_key.as_str())
+                .map(|partition| partition.rows_count())
+                .unwrap_or(0),
+            None => table_access.get_rows_amount(),
         }
-    }
+    };
 
-    let table_access = db_table.data.read();
-
-    let mut result = 0;
-
-    for partition in table_access.get_partitions() {
-        result += partition.rows_count();
-    }
-
-    return HttpOutput::as_text(result.to_string())
-        .into_ok_result(true)
-        .into();
+    HttpOutput::as_text(rows_count.to_string()).into_ok_result(true)
 }

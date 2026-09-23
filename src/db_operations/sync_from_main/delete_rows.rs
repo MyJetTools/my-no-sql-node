@@ -1,33 +1,36 @@
-use std::sync::Arc;
-
-use my_no_sql_sdk::{core::db::PartitionKey, tcp_contracts::DeleteRowTcpContract};
+use my_no_sql_sdk::tcp_contracts::DeleteRowTcpContract;
 
 use crate::{
     app::AppContext,
-    db_sync::{states::DeleteRowsEventSyncData, SyncEvent},
+    db_sync::{DeleteRowsEventSyncData, SyncEvent},
+    namespaces::NodeNamespace,
 };
 
-pub async fn delete_rows(
-    app: &Arc<AppContext>,
+pub fn delete_rows(
+    app: &AppContext,
+    namespace: &NodeNamespace,
     table_name: String,
     rows: Vec<DeleteRowTcpContract>,
 ) {
-    let db_table = super::get_or_add_table(app, table_name.as_str()).await;
+    let Some(db_table) = namespace.db.get_table(table_name.as_str()) else {
+        return;
+    };
 
-    let mut table_data = db_table.data.write();
+    let mut sync_data = DeleteRowsEventSyncData::new(db_table.name.clone());
 
-    let mut sync_data = DeleteRowsEventSyncData::new(&table_data);
+    {
+        let mut table_data = db_table.data.write();
 
-    for db_row in rows {
-        let partition_key = PartitionKey::new(db_row.partition_key);
-
-        let removed_row = table_data.remove_row(&partition_key, &db_row.row_key, true);
-
-        if let Some(deleted_row) = removed_row {
-            let (partition_key, deleted_row, _) = deleted_row;
-            sync_data.add_deleted_row(partition_key.as_str(), deleted_row);
+        for row in rows {
+            if let Some((partition_key, deleted_row, _)) =
+                table_data.remove_row(&row.partition_key, &row.row_key, true)
+            {
+                sync_data.add_deleted_row(partition_key.as_str(), deleted_row);
+            }
         }
     }
 
-    app.dispatch(SyncEvent::DeleteRows(sync_data));
+    if sync_data.has_data() {
+        app.dispatch(namespace.name.clone(), SyncEvent::DeleteRows(sync_data));
+    }
 }

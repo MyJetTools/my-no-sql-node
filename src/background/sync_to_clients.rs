@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
 use my_no_sql_sdk::{
-    core::rust_extensions::events_loop::EventsLoopTick, tcp_contracts::MyNoSqlTcpContract,
+    core::rust_extensions::events_loop::{EventsLoopTick, RepeatIteration},
+    tcp_contracts::MyNoSqlTcpContract,
 };
 
-use crate::{app::AppContext, data_readers::DataReaderConnection, db_sync::SyncEvent};
+use crate::{
+    app::AppContext,
+    data_readers::DataReaderConnection,
+    db_sync::{NamespaceSyncEvent, SyncEvent},
+};
 
+/// Delivers the changes to the readers.
 pub struct SyncEventsToClients {
     app: Arc<AppContext>,
 }
@@ -14,87 +20,72 @@ impl SyncEventsToClients {
     pub fn new(app: Arc<AppContext>) -> Self {
         Self { app }
     }
-}
 
-#[async_trait::async_trait]
-impl EventsLoopTick<SyncEvent> for SyncEventsToClients {
-    async fn started(&self) {
-        println!("Sync to clients event loop started");
-    }
-    async fn tick(&self, sync_event: SyncEvent) {
-        if let SyncEvent::TableFirstInit(data) = &sync_event {
+    fn sync_to_clients(&self, model: &NamespaceSyncEvent) {
+        let sync_event = &model.event;
+
+        if let SyncEvent::TableFirstInit(data) = sync_event {
             data.data_reader.set_first_init();
 
             match &data.data_reader.connection {
                 DataReaderConnection::Tcp(tcp_info) => {
-                    let payloads_to_send =
-                        crate::data_readers::tcp_connection::tcp_payload_to_send::serialize(
-                            &sync_event,
-                        )
-                        .await;
-
-                    for payload_to_send in payloads_to_send {
-                        tcp_info.send(&payload_to_send).await;
-                    }
+                    tcp_info.send(crate::data_readers::compile_tcp_payload(sync_event).as_slice());
                 }
                 DataReaderConnection::Http(http_info) => {
-                    http_info.send(&sync_event).await;
+                    http_info.send(sync_event);
                 }
             }
 
             self.app
                 .metrics
-                .update_pending_to_sync(&data.data_reader.connection)
-                .await;
-        } else {
-            let data_readers = self
-                .app
-                .data_readers
-                .get_subscribed_to_table(sync_event.get_table_name())
-                .await;
+                .update_pending_to_sync(&data.data_reader.connection);
 
-            if data_readers.is_none() {
-                return;
+            return;
+        }
+
+        let data_readers = self
+            .app
+            .data_readers
+            .get_subscribed_to_table(&model.namespace, sync_event.get_table_name());
+
+        // Serialized once and only if some TCP reader needs it.
+        let mut tcp_contracts: Option<Vec<MyNoSqlTcpContract>> = None;
+
+        for data_reader in data_readers.iter() {
+            // It has not got the table yet: the snapshot it is going to get is taken later and
+            // carries this change already.
+            if !data_reader.has_first_init() {
+                continue;
             }
-            let data_readers = data_readers.unwrap();
 
-            let mut tcp_contract_to_send: Option<Vec<MyNoSqlTcpContract>> = None;
+            match &data_reader.connection {
+                DataReaderConnection::Tcp(tcp_info) => {
+                    let tcp_contracts = tcp_contracts.get_or_insert_with(|| {
+                        crate::data_readers::compile_tcp_payload(sync_event)
+                    });
 
-            for data_reader in &data_readers {
-                if !data_reader.has_first_init() {
-                    continue;
+                    tcp_info.send(tcp_contracts.as_slice());
                 }
-
-                match &data_reader.connection {
-                    DataReaderConnection::Tcp(info) => {
-                        if tcp_contract_to_send.is_none() {
-                            tcp_contract_to_send =
-                                crate::data_readers::tcp_connection::tcp_payload_to_send::serialize(
-                                    &sync_event,
-                                )
-                                .await
-                                .into();
-                        }
-
-                        if let Some(to_send) = &tcp_contract_to_send {
-                            for tcp_contract in to_send {
-                                info.send(&tcp_contract).await;
-                            }
-                        }
-                    }
-                    DataReaderConnection::Http(http_info) => {
-                        http_info.send(&sync_event).await;
-                    }
+                DataReaderConnection::Http(http_info) => {
+                    http_info.send(sync_event);
                 }
-
-                self.app
-                    .metrics
-                    .update_pending_to_sync(&data_reader.connection)
-                    .await;
             }
+
+            self.app
+                .metrics
+                .update_pending_to_sync(&data_reader.connection);
         }
     }
-    async fn finished(&self) {
-        println!("Sync to clients event loop finished");
+}
+
+#[async_trait::async_trait]
+impl EventsLoopTick<NamespaceSyncEvent> for SyncEventsToClients {
+    async fn started(&self) {}
+
+    async fn tick(&self, model: NamespaceSyncEvent) -> RepeatIteration<NamespaceSyncEvent> {
+        self.sync_to_clients(&model);
+        RepeatIteration::No
     }
+
+    async fn finished(&self) {}
 }

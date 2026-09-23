@@ -9,13 +9,14 @@ use super::models::{DataReaderGreetingInputModel, DataReaderGreetingResult};
 
 #[http_route(
     method: "POST",
-    route: "/DataReader/Greeting",
+    route: "/api/DataReader/Greeting",
+    deprecated_routes: ["/DataReader/Greeting"],
     controller: "DataReader",
     summary: "Issue session for http data reader",
     description: "Issues session for http data reader",
     input_data: "DataReaderGreetingInputModel",
     result:[
-        {status_code: 200, description: "Successful operation"},
+        {status_code: 200, description: "Successful operation", model: "DataReaderGreetingResult"},
     ]
 )]
 pub struct GreetingAction {
@@ -30,22 +31,19 @@ impl GreetingAction {
 
 async fn handle_request(
     action: &GreetingAction,
-    http_input: DataReaderGreetingInputModel,
+    input_data: DataReaderGreetingInputModel,
     ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let result = action
+    let data_reader = action
         .app
         .data_readers
-        .add_http(ctx.request.get_ip().get_real_ip().to_string())
-        .await;
+        .add_http(ctx.request.get_ip().get_real_ip_as_string());
 
-    result
-        .set_name_as_reader(format!("{}:{}", http_input.name, http_input.version))
-        .await;
+    data_reader.set_name(format!("{}:{}", input_data.name, input_data.version));
 
     let response = DataReaderGreetingResult {
-        session_id: result.id.to_string(),
+        session_id: data_reader.id.to_string(),
     };
 
-    HttpOutput::as_json(response).into_ok_result(true).into()
+    HttpOutput::as_json(response).into_ok_result(true)
 }

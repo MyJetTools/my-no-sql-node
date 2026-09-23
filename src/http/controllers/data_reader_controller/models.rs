@@ -1,9 +1,7 @@
 use my_http_server::macros::*;
-use my_http_server::types::RawDataTyped;
+use my_http_server::RawDataTyped;
 use my_no_sql_sdk::core::rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::{Deserialize, Serialize};
-
-use crate::http::controllers::row_controller::models::BaseDbRowContract;
 
 #[derive(MyHttpInput)]
 pub struct DataReaderGreetingInputModel {
@@ -21,6 +19,9 @@ pub struct DataReaderGreetingResult {
 
 #[derive(MyHttpInput)]
 pub struct SubscribeToTableInputModel {
+    #[http_header(name = "ns"; description = "Namespace to work in. Empty or absent means the default namespace")]
+    pub namespace: Option<String>,
+
     #[http_header(name = "session"; description = "Id of session")]
     pub session_id: String,
 
@@ -41,29 +42,6 @@ pub struct GetChangesInputModel {
 
     #[http_body_raw(description = "Update model")]
     pub body: RawDataTyped<GetChangesBodyModel>,
-}
-
-#[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
-pub struct DataReaderChangesResult {
-    #[serde(rename = "initTables")]
-    pub init_table: Option<Vec<BaseDbRowContract>>,
-
-    #[serde(rename = "initPartitions")]
-    pub init_partitions: Option<Vec<BaseDbRowContract>>,
-
-    #[serde(rename = "initRows")]
-    pub init_rows: Option<Vec<BaseDbRowContract>>,
-
-    #[serde(rename = "deleteRows")]
-    pub delete_rows: Option<Vec<DeleteRowsHttpContract>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]
-pub struct DeleteRowsHttpContract {
-    #[serde(rename = "pk")]
-    pub partition_key: String,
-    #[serde(rename = "rk")]
-    pub row_keys: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, MyHttpObjectStructure)]

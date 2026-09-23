@@ -1,4 +1,3 @@
 mod models;
-mod status_controller;
-pub use status_controller::StatusController;
-mod status_bar_model;
+mod status_action;
+pub use status_action::*;

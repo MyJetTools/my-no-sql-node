@@ -1,12 +1,12 @@
 use my_http_server::macros::*;
 use my_http_server::{HttpContext, HttpFailResult, HttpOkResult, HttpOutput};
-use my_no_sql_sdk::server::rust_extensions::date_time::DateTimeAsMicroseconds;
+use my_no_sql_sdk::core::rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use super::models::IsAliveResponse;
 
 #[http_route(
     method: "GET",
-    route: "/Api/IsAlive",
+    route: "/api/IsAlive",
     controller: "Monitoring",
     description: "Returns model shows that service is alive",
     summary: "Returns model shows that service is alive",
@@ -14,33 +14,18 @@ use super::models::IsAliveResponse;
         {status_code: 200, description: "Monitoring result", model: "IsAliveResponse"},
     ]
 )]
-pub struct ApiController {}
-
-impl ApiController {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct IsAliveAction;
 
 async fn handle_request(
-    _: &ApiController,
+    _: &IsAliveAction,
     _ctx: &mut HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let version = env!("CARGO_PKG_VERSION");
-
-    let env_info = match std::env::var("ENV_INFO") {
-        Ok(value) => Some(value),
-        Err(_) => None,
-    };
-
-    let time = DateTimeAsMicroseconds::now();
-
     let response = IsAliveResponse {
-        name: "MyNoSqlServerNode".to_string(),
-        time: time.to_rfc3339(),
-        version: version.to_string(),
-        env_info,
+        name: "MyNoSqlNode".to_string(),
+        time: DateTimeAsMicroseconds::now().to_rfc3339(),
+        version: crate::app::APP_VERSION.to_string(),
+        env_info: std::env::var("ENV_INFO").ok(),
     };
 
-    HttpOutput::as_json(response).into_ok_result(true).into()
+    HttpOutput::as_json(response).into_ok_result(false)
 }

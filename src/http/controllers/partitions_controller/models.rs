@@ -1,14 +1,20 @@
 use my_http_server::macros::*;
-use serde_derive::Serialize;
+use serde::Serialize;
 
 #[derive(MyHttpInput)]
 pub struct GetPartitionsAmountContract {
+    #[http_header(name = "ns"; description = "Namespace to work in. Empty or absent means the default namespace")]
+    pub namespace: Option<String>,
+
     #[http_query(name: "tableName"; description: "Name of a table")]
     pub table_name: String,
 }
 
 #[derive(MyHttpInput)]
 pub struct GetPartitionsListContract {
+    #[http_header(name = "ns"; description = "Namespace to work in. Empty or absent means the default namespace")]
+    pub namespace: Option<String>,
+
     #[http_query(name: "tableName"; description: "Name of a table")]
     pub table_name: String,
 

@@ -1,15 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
-use my_no_sql_sdk::{
-    core::db::DbTableName, server::rust_extensions::date_time::DateTimeAsMicroseconds,
+use my_no_sql_sdk::core::{
+    db::DbNamespaceName, rust_extensions::date_time::DateTimeAsMicroseconds,
 };
-use tokio::sync::RwLock;
+use parking_lot::RwLock;
 
 use crate::tcp_server::MyNoSqlTcpConnection;
 
 use super::{
-    http_connection::HttpConnectionInfo, tcp_connection::TcpConnectionInfo, DataReader,
-    DataReaderConnection, DataReadersData,
+    data_readers_data::DataReadersData, DataReader, DataReaderConnection, HttpConnectionInfo,
+    TcpConnectionInfo,
 };
 
 pub struct DataReadersList {
@@ -25,73 +25,71 @@ impl DataReadersList {
         }
     }
 
-    pub async fn add_tcp(&self, tcp_connection: Arc<MyNoSqlTcpConnection>) {
-        let id = format!("Tcp-{}", tcp_connection.id);
-        println!("New tcp reader connnected {}", id);
-
-        let connection_info = TcpConnectionInfo::new(tcp_connection);
-
-        let connection_info = Arc::new(connection_info);
-
-        let mut write_lock = self.data.write().await;
-
-        let data_reader = DataReader::new(id, DataReaderConnection::Tcp(connection_info));
-        write_lock.insert(Arc::new(data_reader));
-    }
-
-    pub async fn add_http(&self, ip: String) -> Arc<DataReader> {
-        let mut write_lock = self.data.write().await;
-        let id = format!("Http-{}", write_lock.get_next_id());
-
-        let http_connection_info = HttpConnectionInfo::new(id.to_string(), ip);
+    pub fn add_tcp(&self, tcp_connection: Arc<MyNoSqlTcpConnection>) {
+        let connection_id = tcp_connection.id;
 
         let data_reader = Arc::new(DataReader::new(
-            id.clone(),
-            DataReaderConnection::Http(http_connection_info),
+            format!("Tcp-{}", connection_id),
+            DataReaderConnection::Tcp(TcpConnectionInfo::new(tcp_connection)),
         ));
 
-        write_lock.insert(data_reader.clone());
+        self.data.write().insert_tcp(connection_id, data_reader);
+    }
+
+    pub fn add_http(&self, ip: String) -> Arc<DataReader> {
+        let mut write_access = self.data.write();
+
+        let id = format!("Http-{}", write_access.get_next_http_id());
+
+        let data_reader = Arc::new(DataReader::new(
+            id,
+            DataReaderConnection::Http(HttpConnectionInfo::new(ip)),
+        ));
+
+        write_access.insert_http(data_reader.clone());
 
         data_reader
     }
 
-    pub async fn get_tcp(&self, tcp_connection: &MyNoSqlTcpConnection) -> Option<Arc<DataReader>> {
-        let read_lock = self.data.read().await;
-        read_lock.get_tcp(tcp_connection.id)
+    pub fn get_tcp(&self, tcp_connection: &MyNoSqlTcpConnection) -> Option<Arc<DataReader>> {
+        self.data.read().get_tcp(tcp_connection.id)
     }
 
-    pub async fn get_http(&self, session_id: &str) -> Option<Arc<DataReader>> {
-        let read_lock = self.data.read().await;
-        read_lock.get_http(session_id)
+    pub fn get_http(&self, session_id: &str) -> Option<Arc<DataReader>> {
+        self.data.read().get_http(session_id)
     }
 
-    pub async fn remove_tcp(
+    pub fn remove_tcp(&self, tcp_connection: &MyNoSqlTcpConnection) -> Option<Arc<DataReader>> {
+        self.data.write().remove_tcp(tcp_connection.id)
+    }
+
+    pub fn get_all(&self) -> Vec<Arc<DataReader>> {
+        self.data.read().get_all()
+    }
+
+    pub fn get_subscribed_to_table(
         &self,
-        tcp_connection: &MyNoSqlTcpConnection,
-    ) -> Option<Arc<DataReader>> {
-        println!("Tcp reader is disconnnected {}", tcp_connection.id);
-        let mut write_lock = self.data.write().await;
-        write_lock.remove_tcp(tcp_connection.id)
+        namespace: &DbNamespaceName,
+        table_name: &str,
+    ) -> Vec<Arc<DataReader>> {
+        self.data
+            .read()
+            .get_subscribed_to_table(namespace, table_name)
     }
 
-    pub async fn get_all(&self) -> Vec<Arc<DataReader>> {
-        let read_lock = self.data.read().await;
-        read_lock.get_all()
-    }
-
-    pub async fn get_subscribed_to_table(
+    pub fn take_readers_awaiting_table(
         &self,
-        table_name: &DbTableName,
-    ) -> Option<Vec<Arc<DataReader>>> {
-        let read_access = self.data.read().await;
-        read_access.get_subscribred_to_table(table_name).await
+        namespace: &DbNamespaceName,
+        table_name: &str,
+    ) -> Vec<Arc<DataReader>> {
+        self.data
+            .read()
+            .take_readers_awaiting_table(namespace, table_name)
     }
 
-    pub async fn gc_http_sessions(
-        &self,
-        now: DateTimeAsMicroseconds,
-    ) -> Option<Vec<Arc<DataReader>>> {
-        let mut write_access = self.data.write().await;
-        write_access.gc_http_sessions(now, self.http_session_time_out)
+    pub fn gc_http_sessions(&self, now: DateTimeAsMicroseconds) -> Vec<Arc<DataReader>> {
+        self.data
+            .write()
+            .gc_http_sessions(now, self.http_session_time_out)
     }
 }

@@ -1,58 +1,44 @@
-use std::sync::Arc;
-
 use my_json::json_writer::JsonArrayWriter;
 use my_no_sql_sdk::{server::DbTable, tcp_contracts::sync_to_main::UpdateEntityStatisticsData};
 
-use crate::{app::AppContext, db_operations::DbOperationError};
+use crate::namespaces::NodeNamespace;
 
 use super::ReadOperationResult;
 
-pub async fn get_highest_row_and_below(
-    app: &Arc<AppContext>,
+pub fn get_highest_row_and_below(
+    namespace: &NodeNamespace,
     db_table: &DbTable,
-    partition_key: &String,
+    partition_key: &str,
     row_key: &String,
     limit: Option<usize>,
     update_statistics: UpdateEntityStatisticsData,
-) -> Result<ReadOperationResult, DbOperationError> {
-    super::super::check_app_states(app)?;
-
-    let table_inner = db_table.data.read();
-
-    let db_partition = table_inner.get_partition(partition_key);
-
-    if db_partition.is_none() {
-        return Ok(ReadOperationResult::EmptyArray);
-    }
-
-    let db_partition = db_partition.unwrap();
-
-    let mut json_array_writer = JsonArrayWriter::new();
-    let mut count = 0;
-
+) -> ReadOperationResult {
     let has_statistics_to_update = update_statistics.has_data_to_update();
 
+    let mut json_array_writer = JsonArrayWriter::new();
     let mut db_rows = Vec::new();
-    for db_row in db_partition.get_highest_row_and_below(row_key) {
-        if let Some(limit) = limit {
-            if count >= limit {
-                break;
+
+    {
+        let table_inner = db_table.data.read();
+
+        let Some(db_partition) = table_inner.get_partition(partition_key) else {
+            return ReadOperationResult::EmptyArray;
+        };
+
+        for db_row in db_partition.get_highest_row_and_below(row_key) {
+            if let Some(limit) = limit {
+                if db_rows.len() >= limit {
+                    break;
+                }
             }
-        }
-        //update_statistics.update(db_table_wrapper, db_partition, Some(db_row), now);
-        if has_statistics_to_update {
+
+            json_array_writer = json_array_writer.write(db_row.as_ref());
             db_rows.push(db_row.clone());
         }
-
-        json_array_writer = json_array_writer.write(db_row.as_ref());
-
-        count += 1;
     }
 
-    drop(table_inner);
-
-    if db_rows.len() > 0 {
-        app.sync_to_main_node.update(
+    if has_statistics_to_update && !db_rows.is_empty() {
+        namespace.main_node.sync_to_main_node.update(
             db_table.name.as_str(),
             partition_key,
             || db_rows.iter().map(|itm| itm.get_row_key()),
@@ -60,7 +46,5 @@ pub async fn get_highest_row_and_below(
         );
     }
 
-    return Ok(ReadOperationResult::RowsArray(
-        json_array_writer.build().into_bytes(),
-    ));
+    ReadOperationResult::RowsArray(json_array_writer.build().into_bytes())
 }

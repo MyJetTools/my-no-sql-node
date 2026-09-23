@@ -1,10 +1,11 @@
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicUsize, Ordering},
     Arc,
 };
 
 use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpContract;
-use tokio::sync::Mutex;
+use my_tcp_sockets::SocketAddress;
+use parking_lot::Mutex;
 
 use crate::tcp_server::MyNoSqlTcpConnection;
 
@@ -12,10 +13,9 @@ use super::SendPerSecond;
 
 pub struct TcpConnectionInfo {
     pub connection: Arc<MyNoSqlTcpConnection>,
-    pub name: Mutex<Option<String>>,
+    name: Mutex<Option<String>>,
     sent_per_second_accumulator: AtomicUsize,
     pub sent_per_second: SendPerSecond,
-    pub is_node: AtomicBool,
 }
 
 impl TcpConnectionInfo {
@@ -25,52 +25,42 @@ impl TcpConnectionInfo {
             name: Mutex::new(None),
             sent_per_second_accumulator: AtomicUsize::new(0),
             sent_per_second: SendPerSecond::new(),
-            is_node: AtomicBool::new(false),
         }
     }
 
-    pub fn is_node(&self) -> bool {
-        self.is_node.load(Ordering::Relaxed)
-    }
-
-    pub fn get_id(&self) -> i32 {
-        self.connection.id
-    }
-
     pub fn get_ip(&self) -> String {
+        // The address alone - its Display form prefixes it with the transport.
         match &self.connection.addr {
-            Some(addr) => format!("{}", addr),
+            Some(SocketAddress::Tcp(addr)) => addr.to_string(),
+            Some(addr @ SocketAddress::UnixSocket(_)) => addr.to_string(),
             None => "unknown".to_string(),
         }
     }
 
-    pub async fn get_name(&self) -> Option<String> {
-        let read_access = self.name.lock().await;
-        read_access.clone()
+    pub fn get_name(&self) -> Option<String> {
+        self.name.lock().clone()
     }
 
-    pub async fn set_name_as_reader(&self, name: String) {
-        let mut write_access = self.name.lock().await;
-        *write_access = Some(name);
+    pub fn set_name(&self, name: String) {
+        *self.name.lock() = Some(name);
     }
 
-    pub async fn send(&self, contract: &MyNoSqlTcpContract) {
-        let size = self.connection.send(contract);
+    pub fn send(&self, contracts: &[MyNoSqlTcpContract]) {
+        let sent_amount = self.connection.send_many(contracts);
+
         self.sent_per_second_accumulator
-            .fetch_add(size, std::sync::atomic::Ordering::SeqCst);
+            .fetch_add(sent_amount, Ordering::Relaxed);
     }
 
-    pub async fn timer_1sec_tick(&self) {
-        let value = self
-            .sent_per_second_accumulator
-            .swap(0, std::sync::atomic::Ordering::SeqCst);
-        self.sent_per_second.add(value).await;
+    pub fn timer_1sec_tick(&self) {
+        let value = self.sent_per_second_accumulator.swap(0, Ordering::Relaxed);
+        self.sent_per_second.add(value);
     }
 
     pub fn get_pending_to_send(&self) -> usize {
         self.connection
             .statistics()
             .pending_to_send_buffer_size
-            .load(std::sync::atomic::Ordering::Relaxed)
+            .load(Ordering::Relaxed)
     }
 }

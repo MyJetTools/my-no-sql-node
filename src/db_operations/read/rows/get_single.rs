@@ -1,44 +1,35 @@
 use my_no_sql_sdk::{server::DbTable, tcp_contracts::sync_to_main::UpdateEntityStatisticsData};
 
-use crate::{app::AppContext, db_operations::DbOperationError};
+use crate::{
+    db_operations::{read::ReadOperationResult, DbOperationError},
+    namespaces::NodeNamespace,
+};
 
-use super::super::ReadOperationResult;
-
-pub async fn get_single(
-    app: &std::sync::Arc<AppContext>,
+pub fn get_single(
+    namespace: &NodeNamespace,
     db_table: &DbTable,
-    partition_key: &String,
+    partition_key: &str,
     row_key: &str,
     update_statistics: UpdateEntityStatisticsData,
 ) -> Result<ReadOperationResult, DbOperationError> {
-    super::super::super::check_app_states(app)?;
+    let db_row = {
+        let table_inner = db_table.data.read();
 
-    let table_inner = db_table.data.read();
+        table_inner
+            .get_partition(partition_key)
+            .and_then(|db_partition| db_partition.get_row_and_clone(row_key))
+    };
 
-    let db_partition = table_inner.get_partition(partition_key);
-
-    if db_partition.is_none() {
+    let Some(db_row) = db_row else {
         return Err(DbOperationError::RecordNotFound);
-    }
+    };
 
-    let db_partition = db_partition.unwrap();
-
-    let db_row = db_partition.get_row(row_key);
-
-    if db_row.is_none() {
-        return Err(DbOperationError::RecordNotFound);
-    }
-
-    let db_row = db_row.unwrap().clone();
-
-    drop(table_inner);
-
-    app.sync_to_main_node.update(
+    namespace.main_node.sync_to_main_node.update(
         db_table.name.as_str(),
         partition_key,
         || [db_row.get_row_key()].into_iter(),
         &update_statistics,
     );
 
-    return Ok(ReadOperationResult::SingleRow(db_row.to_vec()));
+    Ok(ReadOperationResult::SingleRow(db_row.to_vec()))
 }

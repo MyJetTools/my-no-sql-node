@@ -1,5 +1,12 @@
-pub mod controllers;
-mod get_table;
+mod controllers;
 mod http_sessions;
 mod mappers;
-pub mod start_up;
+mod namespace;
+mod start_up;
+mod static_files_guard;
+mod ui_routes_middleware;
+pub use http_sessions::*;
+pub use namespace::*;
+pub use start_up::*;
+pub use static_files_guard::*;
+pub use ui_routes_middleware::*;

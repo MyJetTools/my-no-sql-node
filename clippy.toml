@@ -1,0 +1,4 @@
+# Every HTTP action returns `Result<HttpOkResult, HttpFailResult>` - the signature the `http_route`
+# macro of my-http-server expects. `HttpFailResult` is a type of that library (136 bytes), it can
+# not be boxed on this side.
+large-error-threshold = 256

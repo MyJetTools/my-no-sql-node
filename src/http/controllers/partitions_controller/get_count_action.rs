@@ -30,15 +30,12 @@ impl GetPartitionsCountAction {
 async fn handle_request(
     action: &GetPartitionsCountAction,
     input_data: GetPartitionsAmountContract,
-    _ctx: &HttpContext,
+    ctx: &HttpContext,
 ) -> Result<HttpOkResult, HttpFailResult> {
+    let namespace = crate::http::get_request_namespace(&action.app, ctx)?;
+
     let db_table =
-        crate::db_operations::read::table::get(action.app.as_ref(), input_data.table_name.as_str())
-            .await?;
+        crate::db_operations::read::get_table(&namespace, input_data.table_name.as_str())?;
 
-    let partitions_amount = db_table.get_partitions_amount();
-
-    HttpOutput::as_text(format!("{}", partitions_amount))
-        .into_ok_result(true)
-        .into()
+    HttpOutput::as_text(db_table.get_partitions_amount().to_string()).into_ok_result(true)
 }

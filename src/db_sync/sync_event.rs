@@ -1,6 +1,4 @@
-use my_no_sql_sdk::core::db::DbTableName;
-
-use super::states::{
+use super::{
     DeleteRowsEventSyncData, InitPartitionsSyncData, InitTableEventSyncData,
     TableFirstInitSyncData, UpdateRowsSyncData,
 };
@@ -14,23 +12,18 @@ pub enum SyncEvent {
 
     DeleteRows(DeleteRowsEventSyncData),
 
+    /// The snapshot of a table for the one reader which has just subscribed to it.
     TableFirstInit(TableFirstInitSyncData),
 }
 
 impl SyncEvent {
-    pub fn get_table_name(&self) -> &DbTableName {
+    pub fn get_table_name(&self) -> &str {
         match self {
-            SyncEvent::InitTable(data) => &data.db_table.name,
-            SyncEvent::InitPartitions(data) => &data.table_name,
-            SyncEvent::UpdateRows(data) => &data.table_name,
-            SyncEvent::DeleteRows(data) => &data.table_name,
-            SyncEvent::TableFirstInit(data) => &data.db_table.name,
+            SyncEvent::InitTable(data) => data.db_table.name.as_str(),
+            SyncEvent::InitPartitions(data) => data.table_name.as_str(),
+            SyncEvent::UpdateRows(data) => data.table_name.as_str(),
+            SyncEvent::DeleteRows(data) => data.table_name.as_str(),
+            SyncEvent::TableFirstInit(data) => data.db_table.name.as_str(),
         }
-    }
-}
-
-impl Into<SyncEvent> for InitTableEventSyncData {
-    fn into(self) -> SyncEvent {
-        SyncEvent::InitTable(self)
     }
 }

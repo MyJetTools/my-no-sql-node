@@ -1,14 +1,14 @@
-pub mod api;
-pub mod builder;
-pub mod data_reader_controller;
-pub mod home_controller;
-
-//pub mod logs_controller;
-//pub mod multipart;
-pub mod partitions_controller;
-pub mod prometheus_controller;
-pub mod row_controller;
-pub mod rows_controller;
-pub mod status_controller;
-pub mod tables_controller;
-//mod update_statistics_builder;
+mod api;
+mod builder;
+mod connections_controller;
+mod data_reader_controller;
+mod namespaces_controller;
+mod partitions_controller;
+mod prometheus_controller;
+mod row_controller;
+mod rows_controller;
+mod status_controller;
+mod tables_controller;
+mod update_statistics_headers;
+pub use builder::*;
+pub use update_statistics_headers::*;

@@ -1,24 +1,22 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use my_no_sql_sdk::core::{
+    db::DbNamespaceName, rust_extensions::date_time::DateTimeAsMicroseconds,
 };
+use parking_lot::RwLock;
 
-use my_no_sql_sdk::server::{rust_extensions::date_time::DateTimeAsMicroseconds, DbTable};
-use my_no_sql_sdk::tcp_contracts::MyNoSqlTcpContract;
-use tokio::sync::{Mutex, RwLock};
+use super::{data_reader_updatable_data::DataReaderUpdatableData, DataReaderConnection};
 
-use super::{DataReaderConnection, DataReaderUpdatableData};
-
-pub struct DataReadeMetrics {
+pub struct DataReaderMetrics {
     pub session_id: String,
+    pub namespace: String,
     pub connected: DateTimeAsMicroseconds,
     pub last_incoming_moment: DateTimeAsMicroseconds,
     pub ip: String,
     pub name: Option<String>,
     pub tables: Vec<String>,
+    /// Tables the reader subscribed to which have not arrived from the main node yet.
+    pub awaiting_tables: Vec<String>,
     pub pending_to_send: usize,
 }
 
@@ -27,7 +25,6 @@ pub struct DataReader {
     data: RwLock<DataReaderUpdatableData>,
     pub connection: DataReaderConnection,
     has_first_init: AtomicBool,
-    awating_tables: Mutex<HashMap<String, DateTimeAsMicroseconds>>,
 }
 
 impl DataReader {
@@ -37,20 +34,35 @@ impl DataReader {
             data: RwLock::new(DataReaderUpdatableData::new()),
             connection,
             has_first_init: AtomicBool::new(false),
-            awating_tables: Mutex::new(HashMap::new()),
         }
     }
 
-    pub async fn add_awaiting_tables(&self, table_name: String) {
-        let mut write_access = self.awating_tables.lock().await;
-        write_access.insert(table_name, DateTimeAsMicroseconds::now());
-        //TODO - Make awaiting tables GC
+    pub fn get_namespace(&self) -> DbNamespaceName {
+        self.data.read().get_namespace().clone()
     }
 
-    pub async fn has_awaiting_table(&self, table_name: &str) -> bool {
-        let mut write_access = self.awating_tables.lock().await;
-        let result = write_access.remove(table_name);
-        result.is_some()
+    pub fn set_namespace(&self, namespace: DbNamespaceName) -> Result<(), String> {
+        self.data.write().set_namespace(namespace)
+    }
+
+    pub fn subscribe(&self, namespace: &DbNamespaceName, table_name: &str) -> bool {
+        self.data.write().subscribe(namespace, table_name)
+    }
+
+    pub fn unsubscribe(&self, table_name: &str) {
+        self.data.write().unsubscribe(table_name);
+    }
+
+    pub fn is_subscribed_to(&self, namespace: &DbNamespaceName, table_name: &str) -> bool {
+        self.data.read().is_subscribed_to(namespace, table_name)
+    }
+
+    pub fn add_awaiting_table(&self, namespace: &DbNamespaceName, table_name: &str) -> bool {
+        self.data.write().add_awaiting_table(namespace, table_name)
+    }
+
+    pub fn take_awaiting_table(&self, namespace: &DbNamespaceName, table_name: &str) -> bool {
+        self.data.write().take_awaiting_table(namespace, table_name)
     }
 
     pub fn has_first_init(&self) -> bool {
@@ -61,29 +73,12 @@ impl DataReader {
         self.has_first_init.store(true, Ordering::SeqCst);
     }
 
-    pub async fn has_table(&self, table_name: &str) -> bool {
-        let read_access = self.data.read().await;
-        read_access.has_table(table_name)
+    pub fn get_name(&self) -> Option<String> {
+        self.connection.get_name()
     }
 
-    pub async fn set_name_as_reader(&self, name: String) {
-        self.connection.set_name_as_reader(name).await;
-    }
-
-    pub async fn get_name(&self) -> Option<String> {
-        self.connection.get_name().await
-    }
-
-    pub async fn subscribe(&self, db_table: Arc<DbTable>) {
-        let mut write_access = self.data.write().await;
-        write_access.subscribe(db_table);
-    }
-
-    pub async fn send_error_to_client(&self, message: String) {
-        if let DataReaderConnection::Tcp(tcp) = &self.connection {
-            let error = MyNoSqlTcpContract::Error { message };
-            tcp.send(&error).await;
-        }
+    pub fn set_name(&self, name: String) {
+        self.connection.set_name(name);
     }
 
     fn get_ip(&self) -> String {
@@ -113,33 +108,26 @@ impl DataReader {
         }
     }
 
-    pub async fn get_metrics(&self) -> DataReadeMetrics {
-        let session_id = self.id.to_string();
-        let ip = self.get_ip();
-        let connected = self.get_connected_moment();
-        let last_incoming_moment = self.get_last_incoming_moment();
+    pub fn get_metrics(&self) -> DataReaderMetrics {
+        let (namespace, tables, awaiting_tables) = {
+            let read_access = self.data.read();
+            (
+                read_access.get_namespace().to_string(),
+                read_access.get_table_names(),
+                read_access.get_awaiting_table_names(),
+            )
+        };
 
-        let pending_to_send = self.get_pending_to_send();
-
-        let name = self.connection.get_name().await;
-
-        let read_access = self.data.read().await;
-
-        DataReadeMetrics {
-            session_id,
-            connected,
-            last_incoming_moment,
-            ip,
-            name,
-            tables: read_access.get_table_names(),
-            pending_to_send,
-        }
-    }
-
-    pub fn is_node(&self) -> bool {
-        match &self.connection {
-            DataReaderConnection::Tcp(tcp_connection) => tcp_connection.is_node(),
-            DataReaderConnection::Http(_) => false,
+        DataReaderMetrics {
+            session_id: self.id.to_string(),
+            namespace,
+            connected: self.get_connected_moment(),
+            last_incoming_moment: self.get_last_incoming_moment(),
+            ip: self.get_ip(),
+            name: self.get_name(),
+            tables,
+            awaiting_tables,
+            pending_to_send: self.get_pending_to_send(),
         }
     }
 
@@ -150,15 +138,30 @@ impl DataReader {
         }
     }
 
-    pub async fn ping_http_servers(&self, now: DateTimeAsMicroseconds) {
+    pub fn ping_http_session(&self, now: DateTimeAsMicroseconds) {
         if let DataReaderConnection::Http(info) = &self.connection {
-            info.ping(now).await;
+            info.ping(now);
         }
     }
 
-    pub async fn get_sent_per_second(&self) -> Vec<usize> {
+    /// Bytes sent to the reader during the last second. `None` for an HTTP reader: its
+    /// requests are served by the http server, which does not count bytes per session - there
+    /// is no number to show, not a zero.
+    ///
+    /// What a reader sends is not reported: the socket library counts only a few header bytes
+    /// of every packet it receives.
+    pub fn get_outgoing_per_second(&self) -> Option<usize> {
         match &self.connection {
-            DataReaderConnection::Tcp(tcp) => tcp.sent_per_second.get_snapshot().await,
+            DataReaderConnection::Tcp(tcp) => {
+                Some(tcp.connection.statistics().sent_per_sec.get_value())
+            }
+            DataReaderConnection::Http(_) => None,
+        }
+    }
+
+    pub fn get_sent_per_second(&self) -> Vec<usize> {
+        match &self.connection {
+            DataReaderConnection::Tcp(tcp) => tcp.sent_per_second.get_snapshot(),
             DataReaderConnection::Http(_) => vec![],
         }
     }

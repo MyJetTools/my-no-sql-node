@@ -1,22 +1,20 @@
-use std::{
-    collections::HashMap,
-    sync::{atomic::Ordering, Arc},
-};
+use std::sync::Arc;
 
 use my_logger::LogEventCtx;
 use my_no_sql_sdk::tcp_contracts::{MyNoSqlReaderTcpSerializer, MyNoSqlTcpContract};
-use my_tcp_sockets::{tcp_connection::TcpSocketConnection, SocketEventCallback};
+use my_tcp_sockets::SocketEventCallback;
 
-use crate::{app::AppContext, tcp_server::MyNoSqlTcpConnection};
+use crate::{app::AppContext, namespaces::NodeNamespace, tcp_server::MyNoSqlTcpConnection};
 
-#[derive(Clone)]
+/// Events of the connection one namespace keeps to the main node.
 pub struct TcpClientSocketCallback {
     app: Arc<AppContext>,
+    namespace: Arc<NodeNamespace>,
 }
 
 impl TcpClientSocketCallback {
-    pub fn new(app: Arc<AppContext>) -> Self {
-        Self { app }
+    pub fn new(app: Arc<AppContext>, namespace: Arc<NodeNamespace>) -> Self {
+        Self { app, namespace }
     }
 }
 
@@ -24,39 +22,35 @@ impl TcpClientSocketCallback {
 impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
     for TcpClientSocketCallback
 {
-    async fn connected(
-        &mut self,
-        connection: Arc<TcpSocketConnection<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>>,
-    ) {
-        let contract = MyNoSqlTcpContract::GreetingFromNode {
+    async fn connected(&mut self, connection: Arc<MyNoSqlTcpConnection>) {
+        connection.send(&MyNoSqlTcpContract::GreetingFromNode {
             node_location: self.app.settings.location.to_string(),
             node_version: crate::app::APP_VERSION.to_string(),
             compress: self.app.settings.compress,
-        };
+        });
 
-        connection.send(&contract);
-
-        let tables = self.app.db.get_tables();
-
-        for table in tables.iter() {
-            let contract = MyNoSqlTcpContract::SubscribeAsNode(table.name.to_string());
-            connection.send(&contract);
+        // Right after the Greeting and before the first subscription. The default namespace is
+        // not sent: it is what the main node uses anyway, and staying silent about it keeps a
+        // main node which knows nothing about namespaces working.
+        if !self.namespace.name.is_default() {
+            connection.send(&MyNoSqlTcpContract::SetNamespace {
+                namespace: self.namespace.name.to_string(),
+            });
         }
 
-        self.app
-            .connected_to_main_node
-            .connected(connection.clone())
-            .await;
+        self.namespace.main_node.connected(&connection);
 
-        self.app
+        self.namespace
+            .main_node
             .sync_to_main_node
             .tcp_events_pusher_new_connection_established(connection);
     }
 
     async fn disconnected(&mut self, connection: Arc<MyNoSqlTcpConnection>) {
-        self.app.connected_to_main_node.disconnected().await;
+        self.namespace.main_node.disconnected();
 
-        self.app
+        self.namespace
+            .main_node
             .sync_to_main_node
             .tcp_events_pusher_connection_disconnected(connection);
     }
@@ -66,72 +60,93 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
         connection: &Arc<MyNoSqlTcpConnection>,
         contract: MyNoSqlTcpContract,
     ) {
-        if let MyNoSqlTcpContract::CompressedPayload(data) = &contract {
-            println!("CompressedPayload: {}", data.len());
-        }
-        let contract = contract.decompress_if_compressed().await.unwrap();
-
         match contract {
             MyNoSqlTcpContract::Pong => {
-                if let Some(duration) = connection.statistics().get_ping_pong_duration() {
-                    let microseconds = duration.as_micros();
-                    self.app
-                        .master_node_ping_interval
-                        .store(microseconds as i64, Ordering::SeqCst);
+                if let Some(ping_duration) = connection.statistics().get_ping_pong_duration() {
+                    self.namespace.main_node.update_ping(ping_duration);
                 }
             }
             MyNoSqlTcpContract::InitTable { table_name, data } => {
-                crate::db_operations::sync_from_main::sync_table(&self.app, table_name, data).await;
+                self.namespace.main_node.add_received_payload(data.len());
+                crate::db_operations::sync_from_main::sync_table(
+                    &self.app,
+                    &self.namespace,
+                    table_name,
+                    data,
+                );
             }
             MyNoSqlTcpContract::InitPartition {
                 table_name,
                 partition_key,
                 data,
             } => {
+                self.namespace.main_node.add_received_payload(data.len());
                 crate::db_operations::sync_from_main::sync_partition(
                     &self.app,
+                    &self.namespace,
                     table_name,
                     partition_key,
                     data,
-                )
-                .await;
+                );
             }
             MyNoSqlTcpContract::UpdateRows { table_name, data } => {
-                crate::db_operations::sync_from_main::sync_rows(&self.app, table_name, data).await;
+                self.namespace.main_node.add_received_payload(data.len());
+                crate::db_operations::sync_from_main::sync_rows(
+                    &self.app,
+                    &self.namespace,
+                    table_name,
+                    data,
+                );
             }
             MyNoSqlTcpContract::DeleteRows { table_name, rows } => {
-                crate::db_operations::sync_from_main::delete_rows(&self.app, table_name, rows)
-                    .await;
-            }
-            MyNoSqlTcpContract::Error { message } => {
-                let mut ctx = HashMap::new();
-                ctx.insert("connection_id".to_string(), connection.id.to_string());
-
-                my_logger::LOGGER.write_error(
-                    "TcpPayload",
-                    message,
-                    LogEventCtx::new().add("ConnectionId", connection.id.to_string()),
+                self.namespace.main_node.add_received_payload(
+                    rows.iter()
+                        .map(|row| row.partition_key.len() + row.row_key.len())
+                        .sum(),
+                );
+                crate::db_operations::sync_from_main::delete_rows(
+                    &self.app,
+                    &self.namespace,
+                    table_name,
+                    rows,
                 );
             }
             MyNoSqlTcpContract::TableNotFound(table_name) => {
-                let data_readers = self.app.data_readers.get_all().await;
-
-                for data_reader in data_readers {
-                    if data_reader.has_awaiting_table(table_name.as_str()).await {
-                        data_reader
-                            .send_error_to_client(format!("Table {} not found", table_name))
-                            .await
-                    }
-                }
+                crate::db_operations::sync_from_main::table_not_found(
+                    &self.app,
+                    &self.namespace,
+                    table_name,
+                );
             }
-
             MyNoSqlTcpContract::Confirmation { confirmation_id } => {
-                self.app
+                self.namespace
+                    .main_node
                     .sync_to_main_node
                     .tcp_events_pusher_got_confirmation(confirmation_id);
             }
-
-            _ => {}
+            MyNoSqlTcpContract::Error { message } => {
+                my_logger::LOGGER.write_error(
+                    "MainNodeConnection",
+                    message,
+                    LogEventCtx::new()
+                        .add("namespace", self.namespace.name.to_string())
+                        .add("connectionId", connection.id.to_string()),
+                );
+            }
+            // The main node never sends these to a node. A CompressedPayload never reaches here
+            // either - the serializer inflates it into the packet it carries.
+            MyNoSqlTcpContract::Ping
+            | MyNoSqlTcpContract::Greeting { .. }
+            | MyNoSqlTcpContract::Subscribe { .. }
+            | MyNoSqlTcpContract::GreetingFromNode { .. }
+            | MyNoSqlTcpContract::SubscribeAsNode(_)
+            | MyNoSqlTcpContract::Unsubscribe(_)
+            | MyNoSqlTcpContract::CompressedPayload(_)
+            | MyNoSqlTcpContract::UpdatePartitionsLastReadTime { .. }
+            | MyNoSqlTcpContract::UpdateRowsLastReadTime { .. }
+            | MyNoSqlTcpContract::UpdatePartitionsExpirationTime { .. }
+            | MyNoSqlTcpContract::UpdateRowsExpirationTime { .. }
+            | MyNoSqlTcpContract::SetNamespace { .. } => {}
         }
     }
 }
