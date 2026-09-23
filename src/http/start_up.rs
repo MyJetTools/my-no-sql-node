@@ -21,6 +21,8 @@ pub fn setup_server(app: &Arc<AppContext>) {
     );
 
     http_server.add_middleware(Arc::new(swagger_middleware));
+    // Before the controllers: a writer's reads go to the main node, not to the replica.
+    http_server.add_middleware(Arc::new(super::WriterRequestsMiddleware::new(app.clone())));
     http_server.add_middleware(controllers);
     http_server.add_middleware(Arc::new(super::UiRoutesMiddleware));
     http_server.add_middleware(Arc::new(super::StaticFilesGuard));

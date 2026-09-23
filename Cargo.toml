@@ -30,6 +30,15 @@ my-json = { tag = "0.3.2", git = "https://github.com/MyJetTools/my-json.git" }
 
 my-tcp-sockets = { tag = "0.1.12", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
 
+# Forwards the writes (and everything a writer asks) to the main server's HTTP api - over h2,
+# possibly behind TLS.
+flurl = { tag = "0.7.0", git = "https://github.com/MyJetTools/fl-url.git", features = [
+    "with-ring-tls",
+] }
+# The very crate fl-url is built on - named only to tell its errors apart (the same source and tag
+# as fl-url's, so it resolves to one crate).
+my-http-client = { tag = "0.1.0", git = "https://github.com/my-jet-tools/my-http-client.git" }
+
 tokio = { version = "*", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
@@ -39,7 +48,7 @@ async-trait = "*"
 arc-swap = "*"
 parking_lot = "*"
 
-mimalloc = { version = "*", features = ["override"] }
+tikv-jemallocator = "*"
 
 [build-dependencies]
 ci-utils = { tag = "0.1.3", git = "https://github.com/MyJetTools/ci-utils.git" }

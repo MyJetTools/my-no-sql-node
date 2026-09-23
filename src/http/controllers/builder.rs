@@ -70,5 +70,8 @@ pub fn build(app: &Arc<AppContext>) -> ControllersMiddleware {
         app.clone(),
     )));
 
+    // Writes - forwarded to the main node
+    super::main_server_writes::register_main_server_writes(&mut result, app);
+
     result
 }

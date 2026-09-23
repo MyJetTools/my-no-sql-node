@@ -2,6 +2,7 @@ mod api;
 mod builder;
 mod connections_controller;
 mod data_reader_controller;
+mod main_server_writes;
 mod namespaces_controller;
 mod partitions_controller;
 mod prometheus_controller;

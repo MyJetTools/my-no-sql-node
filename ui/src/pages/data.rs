@@ -7,6 +7,7 @@ use crate::AppContext;
 use crate::AppRoute;
 use crate::RouteKey;
 use crate::components::atoms::{Badge, BadgeTone, Icon, IconKind};
+use crate::components::data::cell::cell_string;
 use crate::components::data::{
     PARTITION_KEY, PartitionsPane, ROW_KEY, RowDrawer, RowsTable, TIME_STAMP, TableHeader,
     TablePagination, TableToolbar, TablesPane,
@@ -610,34 +611,27 @@ fn DrawerMessage(title: String, message: String, on_close: EventHandler<()>) -> 
     }
 }
 
-/// The values of the row as they are shown - no field names, no JSON escaping - lowercased, so
-/// the filter matches what is on the screen.
+/// The cells of the row exactly as the table shows them - no field names, no JSON escaping of
+/// plain strings; a nested object or array is its JSON text, as in its cell - lowercased, so the
+/// filter matches what is on the screen.
 fn build_search_text(row: &Value) -> String {
     let mut result = String::new();
-    push_search_values(row, &mut result);
+
+    match row {
+        Value::Object(fields) => {
+            for value in fields.values() {
+                push_search_value(&mut result, cell_string(value).as_str());
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Array(_) => {
+            push_search_value(&mut result, cell_string(row).as_str());
+        }
+    }
+
     result.to_lowercase()
 }
 
-fn push_search_values(value: &Value, dest: &mut String) {
-    match value {
-        Value::Null => {}
-        Value::Bool(value) => push_search_value(dest, value.to_string().as_str()),
-        Value::Number(value) => push_search_value(dest, value.to_string().as_str()),
-        Value::String(value) => push_search_value(dest, value.as_str()),
-        Value::Array(items) => {
-            for item in items {
-                push_search_values(item, dest);
-            }
-        }
-        Value::Object(fields) => {
-            for field in fields.values() {
-                push_search_values(field, dest);
-            }
-        }
-    }
-}
-
-/// Values are kept apart, so a filter never matches across two of them.
+/// Cells are kept apart, so a filter never matches across two of them.
 fn push_search_value(dest: &mut String, value: &str) {
     if !dest.is_empty() {
         dest.push('\u{1f}');

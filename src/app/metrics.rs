@@ -1,4 +1,4 @@
-use prometheus::{Encoder, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder};
+use prometheus::{Encoder, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder};
 
 use crate::operations::DbTableMetrics;
 
@@ -16,6 +16,7 @@ pub struct PrometheusMetrics {
     pending_to_sync: IntGaugeVec,
     main_node_connected: IntGaugeVec,
     main_node_ping: IntGaugeVec,
+    main_server_http_requests: IntCounterVec,
 }
 
 const TABLE_NAME: &str = "table_name";
@@ -34,6 +35,7 @@ impl PrometheusMetrics {
         let pending_to_sync = create_pending_to_sync();
         let main_node_connected = create_main_node_connected();
         let main_node_ping = create_main_node_ping();
+        let main_server_http_requests = create_main_server_http_requests();
 
         registry
             .register(Box::new(partitions_amount.clone()))
@@ -59,6 +61,10 @@ impl PrometheusMetrics {
 
         registry.register(Box::new(main_node_ping.clone())).unwrap();
 
+        registry
+            .register(Box::new(main_server_http_requests.clone()))
+            .unwrap();
+
         Self {
             registry,
             partitions_amount,
@@ -68,7 +74,15 @@ impl PrometheusMetrics {
             pending_to_sync,
             main_node_connected,
             main_node_ping,
+            main_server_http_requests,
         }
+    }
+
+    /// A request forwarded to the main node's HTTP api, by how it ended.
+    pub fn inc_main_server_http_request(&self, result: &str) {
+        self.main_server_http_requests
+            .with_label_values(&[result])
+            .inc();
     }
 
     pub fn update_table_metrics(
@@ -188,4 +202,15 @@ fn create_main_node_ping() -> IntGaugeVec {
         "Last ping round trip to the main node",
     );
     IntGaugeVec::new(gauge_opts, &[NAMESPACE]).unwrap()
+}
+
+fn create_main_server_http_requests() -> IntCounterVec {
+    IntCounterVec::new(
+        Opts::new(
+            "main_server_http_requests",
+            "Requests forwarded to the main node's HTTP api, by how they ended: the status class of the main node's answer, or not_reachable / broken / timeout / cancelled / not_configured / refused",
+        ),
+        &["result"],
+    )
+    .unwrap()
 }

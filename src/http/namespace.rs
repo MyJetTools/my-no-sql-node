@@ -59,7 +59,7 @@ pub fn get_request_namespace(
     }
 }
 
-fn find_query_param<'s>(query: &'s str, key: &str) -> Option<&'s str> {
+pub fn find_query_param<'s>(query: &'s str, key: &str) -> Option<&'s str> {
     for pair in query.split('&') {
         // A valueless element (`?flag`) is somebody else's parameter, not the end of the query.
         let Some((pair_key, value)) = pair.split_once('=') else {

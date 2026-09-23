@@ -13,6 +13,7 @@ mod data_readers;
 mod db_operations;
 mod db_sync;
 mod http;
+mod main_server_http;
 mod namespaces;
 mod operations;
 mod settings_reader;
@@ -20,7 +21,7 @@ mod tcp_client_to_main_node;
 mod tcp_server;
 
 #[global_allocator]
-static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main]
 async fn main() {

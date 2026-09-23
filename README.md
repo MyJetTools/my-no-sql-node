@@ -1,9 +1,9 @@
 # my-no-sql-node
 
-Read-only replica of [MyNoSqlServer](https://github.com/MyJetTools/my-no-sql-server). A node sits
-next to the readers - in another datacenter, for instance - keeps a copy of the tables they
-subscribe to and serves them the same way the main node does: SDK TCP readers, HTTP readers and
-HTTP reads. Writes always go to the main node.
+Replica of [MyNoSqlServer](https://github.com/MyJetTools/my-no-sql-server) for another datacenter:
+readers and writers connect to the node exactly as they would to the main node. The node keeps a
+copy of the tables its readers subscribe to and serves them the same way the main node does: SDK
+TCP readers, HTTP readers and HTTP reads. Writes are forwarded to the main node.
 
 ## How it works
 
@@ -34,6 +34,9 @@ Compress: true             # the main node compresses what it sends to the node
 HttpPort: 5123             # optional, 5123 by default
 TcpPort: 5125              # optional, 5125 by default
 MaxNamespaces: 16          # optional, 16 by default - a connection to the main node each
+MainServerHttp: http://10.0.0.1:5123  # optional - the main node's HTTP api; without it writes are refused
+CompressWrites: false      # optional, false by default - gzip the forwarded request bodies
+MainServerHttpTimeoutSec: 8   # optional, 8 by default - keep it below the writers' timeout (10 s)
 ```
 
 `MainServer` may be `host:port` or a connection string `host=10.0.0.1:5125`, but must not name a
@@ -41,11 +44,48 @@ namespace: the node replicates every namespace its readers subscribe in. `MaxNam
 many: a reader subscribing in one namespace too many is refused with an error, rather than making
 the node open connections to the main node without limit.
 
+## Writes
+
+With `MainServerHttp` set, the node takes every write of the main node's HTTP api - the same routes
+(`/api/Row/*`, `/api/Bulk/*`, `/api/Rows/DeletePartitions`, `/api/Tables/*`, `/api/Transactions/*`,
+`/api/GarbageCollector/*`, `/api/Ping`), their old forms without `/api` and the same contracts - and
+forwards it to the main node: method, path and query byte for byte, headers (`ns`, `session`,
+`apikey`, ...) and body. The main node's answer comes back as it is. The node imitates a writer:
+
+* **A writer's requests all go to the main node, its reads too.** The SDK writer (my-no-sql-sdk
+  0.5.x, and 0.4.1 since June 2026) sends a `session` header with every request; with it, reads
+  (`/Row`, `/api/Count`, `/api/Partitions`, ...) are forwarded as well, so a writer sees exactly what
+  it would see on the main node - not the replica, which holds only the tables the readers
+  subscribed to and is a moment behind. Readers and other clients read from the replica.
+* **Older writers** send no `session` header. Their writes are forwarded all the same, and so are
+  their reads of the tables the node does not replicate; a read of a table the node does replicate
+  is served from the replica - a moment behind the main node.
+* **HTTP/2.** One multiplexed connection: h2c with prior knowledge for `http://`, ALPN for
+  `https://` (a proxy in front of the main node has to speak h2). All the writers behind the node
+  share it - and the main node's 200 concurrent streams per connection.
+* **A write which did not reach the main node never looks done.** If the main node is not reachable
+  or does not answer in time, the node answers `400` with the reason: the SDK writer reports every
+  `400` as a failed write, while it takes some `5xx` answers (`clean_and_bulk_insert`,
+  `delete_partitions`) for success. The answer comes within `MainServerHttpTimeoutSec` + 1 s,
+  connecting included. It says whether the request never reached the main node or may have been
+  applied (a timeout, a connection broken with the request in flight). As with a writer connected
+  to the main node directly, `PUT` and `DELETE` are sent again when the connection breaks.
+* **Compressed bodies.** A writer may compress its body (`gzip`, `deflate`, `br`, `zstd`): the node
+  decodes it and sends it on decoded - up to 64 MiB decoded, `413` past it, the same limit as the
+  main node's. **`CompressWrites`** gzips what the node sends: bodies from 1 KB to 64 MiB
+  (`Content-Encoding: gzip`), a bigger one goes as it is, since the main node would refuse to
+  decode it. It needs a main node which decodes request bodies: my-no-sql-server 0.6.6 and later.
+* The main node sees the node as the address of every writer behind it (the node sends
+  `X-Forwarded-For`, which the main node does not read for writers).
+* Administration of the main node itself - backups, persistence, its UI settings, deleting a
+  namespace - is not forwarded, and neither is `Tables/MigrateFrom` (it makes the main node fetch
+  a url of its own datacenter). Only the routes of the api a writer uses reach the main node.
+
 ## Ports
 
 | Port | What |
 |---|---|
-| `5123` | HTTP: UI (`/`), swagger (`/swagger`), read API, HTTP readers, `/metrics` |
+| `5123` | HTTP: UI (`/`), swagger (`/swagger`), read API, forwarded writes, HTTP readers, `/metrics` |
 | `5125` | TCP readers - the same protocol as the reader port of the main node |
 
 ## HTTP API
@@ -92,7 +132,10 @@ models with the node through the `rest-api-shared` crate, so the two can not dis
 * `main_node_connected{ns}` - `1` while the namespace is connected to the main node;
 * `main_node_ping_microseconds{ns}`;
 * `table_size{ns,table_name}`, `table_partitions_amount{ns,table_name}`;
-* `tcp_connections_count`, `tcp_changes_count{tcp_metric}`, `pending_to_send{table_name}` (by reader).
+* `tcp_connections_count`, `tcp_changes_count{tcp_metric}`, `pending_to_send{table_name}` (by reader);
+* `main_server_http_requests{result}` - forwarded requests by how they ended: the status class of
+  the main node's answer (`2xx` ... `5xx`), or `not_reachable`, `broken`, `timeout`, `cancelled`
+  (the client gave up first), `not_configured`, `refused`.
 
 ## Build and release
 

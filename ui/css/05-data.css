@@ -243,7 +243,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
-    flex-shrink: 0;
+    /* A long table name gives way to the reload button - the rows column clips what does not
+       fit. */
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .table-header__title {
@@ -251,11 +254,16 @@
     font-size: 18px;
     font-weight: 600;
     color: var(--text);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .table-header__meta {
     display: flex;
     align-items: center;
+    min-width: 0;
     gap: 18px;
     color: var(--text-muted);
     font-family: var(--font-mono);
@@ -272,6 +280,8 @@
 .table-header__actions {
     display: flex;
     gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .table-toolbar-new {
@@ -607,7 +617,9 @@
 
 .table-pagination__controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    min-width: 0;
     gap: 4px;
 }
 

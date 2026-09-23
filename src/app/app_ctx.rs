@@ -7,6 +7,7 @@ use my_no_sql_sdk::core::{
 
 use crate::{
     data_readers::DataReadersList,
+    main_server_http::MainServerHttp,
     db_sync::{NamespaceSyncEvent, SyncEvent},
     namespaces::NodeNamespaces,
     settings_reader::SettingsModel,
@@ -25,6 +26,8 @@ pub struct AppContext {
     pub sync_to_clients: EventsLoop<NamespaceSyncEvent>,
     pub states: Arc<AppStates>,
     pub settings: Arc<SettingsModel>,
+    /// Where the writes go - `None` when the node is not told the main node's HTTP api.
+    pub main_server_http: Option<MainServerHttp>,
 }
 
 impl AppContext {
@@ -35,6 +38,13 @@ impl AppContext {
             metrics: PrometheusMetrics::new(),
             sync_to_clients: EventsLoop::new("SyncToClients"),
             states: Arc::new(AppStates::create_initialized()),
+            main_server_http: settings.main_server_http.as_ref().map(|url| {
+                MainServerHttp::new(
+                    url.to_string(),
+                    settings.get_compress_writes(),
+                    settings.get_main_server_http_timeout(),
+                )
+            }),
             settings,
         }
     }
