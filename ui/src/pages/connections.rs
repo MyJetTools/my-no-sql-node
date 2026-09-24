@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use dioxus::prelude::*;
 
-use crate::components::atoms::{Badge, BadgeTone, MiniChart, MiniChartSeries, StatePill, StateTone};
+use crate::components::atoms::{
+    Badge, BadgeTone, LatencyPill, MiniChart, MiniChartSeries, StatePill, StateTone,
+};
 use crate::models::{
     ConnectionReaderContract, ConnectionsContract, DEFAULT_NAMESPACE, MainNodeConnectionContract,
 };
@@ -303,6 +305,9 @@ fn render_readers_table(readers: &[&ConnectionReaderContract], namespace: &str) 
                 td { class: "conn-table__id", "{reader.id}" }
                 td { "{reader.name}" }
                 td { "{reader.ip}" }
+                td {
+                    LatencyPill { latency: reader.latency }
+                }
                 td { span { class: "badge-list", {waiting_badges} {table_badges} } }
                 td { class: "conn-table__num", "{outgoing}" }
                 td { class: "conn-table__num", "{format_bytes(reader.pending_to_send as f64)}" }
@@ -324,6 +329,7 @@ fn render_readers_table(readers: &[&ConnectionReaderContract], namespace: &str) 
                             th { "ID" }
                             th { "Name" }
                             th { "IP" }
+                            th { "Latency" }
                             th { "Tables" }
                             th { class: "conn-table__num", "Outgoing" }
                             th { class: "conn-table__num", "Pending" }

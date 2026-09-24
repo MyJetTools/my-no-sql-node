@@ -142,6 +142,7 @@ fn get_readers(app: &AppContext) -> Readers {
                 .into_iter()
                 .map(|itm| itm as u64)
                 .collect(),
+            latency: metrics.latency,
         });
     }
 

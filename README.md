@@ -22,6 +22,11 @@ TCP readers, HTTP readers and HTTP reads. Writes are forwarded to the main node.
   its readers and asked for again every 30 seconds, so it is picked up once it is created anew.
 * **Read statistics.** Last read time and expiration time updates the readers send are forwarded to
   the main node - the node does not expire anything itself.
+* **Latency.** A reader measures the round trip of its keep-alive ping and reports it with the next
+  one (`PingWithLatency`, my-no-sql-sdk from my-jet-tools); the node keeps it and shows it. The
+  node reports its own round trip to the main node the same way, so the main node shows the
+  latency of its nodes. A main node which predates the packet drops the connection on it: the node
+  needs my-no-sql-server 0.7.0 or later - upgrade the main node first.
 
 ## Settings
 
@@ -111,8 +116,9 @@ files (`/assets/*`, `/favicon.*`). Any other path is a 404.
 
 * **Overview** - the links to the main node (one per namespace) with their latency, the health of
   every reader (how long it has been silent: slow after 6 s, stalled after 15 s - a reader pings
-  every ~3 s), which tables are read, and the readers which wait for a table or read one the main
-  node does not have.
+  every ~3 s) and its latency (slow from 100 ms, bad from 300 ms; `—` for a reader which does not
+  report one: an HTTP reader, an older SDK), which tables are read, and the readers which wait for a
+  table or read one the main node does not have.
 * **Tables** - the tables of the selected namespace. A node has no tables of its own: each one is
   there because a reader subscribed to it, so this is exactly the set of replicated tables, each
   with its state - replicated, waiting for the main node, or not found on the main node. Partitions
@@ -133,6 +139,8 @@ models with the node through the `rest-api-shared` crate, so the two can not dis
 * `main_node_ping_microseconds{ns}`;
 * `table_size{ns,table_name}`, `table_partitions_amount{ns,table_name}`;
 * `tcp_connections_count`, `tcp_changes_count{tcp_metric}`, `pending_to_send{table_name}` (by reader);
+* `reader_latency_microseconds{ns,reader}` - the round trip a reader reported; the worst one when
+  several connections of an app share the name;
 * `main_server_http_requests{result}` - forwarded requests by how they ended: the status class of
   the main node's answer (`2xx` ... `5xx`), or `not_reachable`, `broken`, `timeout`, `cancelled`
   (the client gave up first), `not_configured`, `refused`.

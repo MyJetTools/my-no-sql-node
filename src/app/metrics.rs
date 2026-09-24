@@ -1,6 +1,12 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use parking_lot::Mutex;
 use prometheus::{Encoder, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder};
 
 use crate::operations::DbTableMetrics;
+
+/// Labels of one `reader_latency_microseconds` series: namespace, reader name.
+pub type ReaderLatencyKey = (String, String);
 
 pub trait UpdatePendingToSyncModel {
     fn get_name(&self) -> Option<String>;
@@ -17,6 +23,10 @@ pub struct PrometheusMetrics {
     main_node_connected: IntGaugeVec,
     main_node_ping: IntGaugeVec,
     main_server_http_requests: IntCounterVec,
+    reader_latency: IntGaugeVec,
+    /// Series `reader_latency` holds right now - the ones missing from the next update are
+    /// removed.
+    reader_latency_keys: Mutex<BTreeSet<ReaderLatencyKey>>,
 }
 
 const TABLE_NAME: &str = "table_name";
@@ -24,6 +34,7 @@ const TABLE_NAME: &str = "table_name";
 /// "default" rather than as an absent label.
 const NAMESPACE: &str = "ns";
 const TCP_METRIC: &str = "tcp_metric";
+const READER: &str = "reader";
 
 impl PrometheusMetrics {
     pub fn new() -> Self {
@@ -36,6 +47,7 @@ impl PrometheusMetrics {
         let main_node_connected = create_main_node_connected();
         let main_node_ping = create_main_node_ping();
         let main_server_http_requests = create_main_server_http_requests();
+        let reader_latency = create_reader_latency();
 
         registry
             .register(Box::new(partitions_amount.clone()))
@@ -65,6 +77,8 @@ impl PrometheusMetrics {
             .register(Box::new(main_server_http_requests.clone()))
             .unwrap();
 
+        registry.register(Box::new(reader_latency.clone())).unwrap();
+
         Self {
             registry,
             partitions_amount,
@@ -75,7 +89,32 @@ impl PrometheusMetrics {
             main_node_connected,
             main_node_ping,
             main_server_http_requests,
+            reader_latency,
+            reader_latency_keys: Mutex::new(BTreeSet::new()),
         }
+    }
+
+    /// Replaces the whole set of latency series with `latencies` - every reader which reported
+    /// one, keyed by its labels. A series is dropped once its reader is not in the set any more,
+    /// which is how a disconnect reaches it.
+    pub fn update_readers_latency(&self, latencies: BTreeMap<ReaderLatencyKey, i64>) {
+        let mut keys = self.reader_latency_keys.lock();
+
+        for (namespace, reader) in keys.iter() {
+            if !latencies.contains_key(&(namespace.clone(), reader.clone())) {
+                let _ = self
+                    .reader_latency
+                    .remove_label_values(&[namespace.as_str(), reader.as_str()]);
+            }
+        }
+
+        for ((namespace, reader), latency) in latencies.iter() {
+            self.reader_latency
+                .with_label_values(&[namespace.as_str(), reader.as_str()])
+                .set(*latency);
+        }
+
+        *keys = latencies.into_keys().collect();
     }
 
     /// A request forwarded to the main node's HTTP api, by how it ended.
@@ -204,6 +243,15 @@ fn create_main_node_ping() -> IntGaugeVec {
     IntGaugeVec::new(gauge_opts, &[NAMESPACE]).unwrap()
 }
 
+fn create_reader_latency() -> IntGaugeVec {
+    let gauge_opts = Opts::new(
+        "reader_latency_microseconds",
+        "Round trip to the reader, as it measured it and reported with PingWithLatency. The worst one when several connections share the labels",
+    );
+
+    IntGaugeVec::new(gauge_opts, &[NAMESPACE, READER]).unwrap()
+}
+
 fn create_main_server_http_requests() -> IntCounterVec {
     IntCounterVec::new(
         Opts::new(
@@ -213,4 +261,42 @@ fn create_main_server_http_requests() -> IntCounterVec {
         &["result"],
     )
     .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::PrometheusMetrics;
+
+    fn latency_of(metrics: &PrometheusMetrics, reader: &str) -> Option<String> {
+        let label = format!("reader=\"{}\"", reader);
+
+        metrics
+            .build()
+            .lines()
+            .filter(|line| line.starts_with("reader_latency_microseconds{"))
+            .find(|line| line.contains(label.as_str()))
+            .and_then(|line| line.split_whitespace().last().map(|itm| itm.to_string()))
+    }
+
+    #[test]
+    fn latency_of_a_reader_which_is_gone_is_removed() {
+        let metrics = PrometheusMetrics::new();
+
+        let mut latencies = BTreeMap::new();
+        latencies.insert(("default".to_string(), "app-a".to_string()), 1500);
+        latencies.insert(("alpha".to_string(), "app-b".to_string()), 700);
+        metrics.update_readers_latency(latencies);
+
+        assert_eq!(Some("1500".to_string()), latency_of(&metrics, "app-a"));
+        assert_eq!(Some("700".to_string()), latency_of(&metrics, "app-b"));
+
+        let mut latencies = BTreeMap::new();
+        latencies.insert(("alpha".to_string(), "app-b".to_string()), 900);
+        metrics.update_readers_latency(latencies);
+
+        assert_eq!(None, latency_of(&metrics, "app-a"));
+        assert_eq!(Some("900".to_string()), latency_of(&metrics, "app-b"));
+    }
 }

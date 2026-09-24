@@ -35,6 +35,7 @@ pub fn build_connections(app: &AppContext) -> ConnectionsContract {
                 now.duration_since(metrics.last_incoming_moment)
                     .as_positive_or_zero()
             ),
+            latency: metrics.latency,
         });
     }
 

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use my_no_sql_sdk::core::rust_extensions::{MyTimerTick, RepeatTimerIteration};
 
@@ -37,11 +37,24 @@ impl MyTimerTick for MetricsUpdater {
             }
         }
 
+        let mut readers_latency = BTreeMap::new();
+
         for reader in self.app.data_readers.get_all() {
             self.app.metrics.update_pending_to_sync(&reader.connection);
 
+            if let (Some(latency), Some(name)) = (reader.get_latency(), reader.get_name()) {
+                let key = (reader.get_namespace().to_string(), name);
+
+                // Replicas of one app connect under one name - the slowest of them is the one
+                // worth an alert.
+                let worst = readers_latency.entry(key).or_insert(latency);
+                *worst = (*worst).max(latency);
+            }
+
             reader.connection.one_sec_tick();
         }
+
+        self.app.metrics.update_readers_latency(readers_latency);
 
         RepeatTimerIteration::WithInterval
     }

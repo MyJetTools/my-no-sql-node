@@ -62,6 +62,10 @@ pub struct ReaderModel {
     pub pending_to_send: u64,
     #[serde(rename = "sentPerSecond")]
     pub sent_per_second: Vec<u64>,
+    // Round trip in microseconds, as the reader measured it and reported with its last
+    // `PingWithLatency`. Null until it does - and always for HTTP readers and for readers on an
+    // SDK which predates the packet.
+    pub latency: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, MyHttpObjectStructure, Clone, Debug, PartialEq)]

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::components::atoms::{
-    Badge, BadgeTone, Sparkline, StateTone, StatusDot, classify_reader,
+    Badge, BadgeTone, LatencyPill, Sparkline, StateTone, StatusDot, classify_reader,
 };
 use crate::models::{ReaderModel, TABLE_SYNC_NOT_FOUND, TableModel};
 use crate::settings::HealthThresholds;
@@ -133,6 +133,9 @@ pub fn ReadersTable(readers: Vec<ReaderModel>, tables: Vec<TableModel>) -> Eleme
                 td { class: "mono muted",
                     span { class: "dt-ellipsis", "{r.ip}" }
                 }
+                td {
+                    LatencyPill { latency: r.latency }
+                }
                 td { style: "max-width:220px;",
                     Sparkline { values: sent, bytes_label: true }
                 }
@@ -214,6 +217,7 @@ pub fn ReadersTable(readers: Vec<ReaderModel>, tables: Vec<TableModel>) -> Eleme
                         th { "Client" }
                         th { "Namespace" }
                         th { "Address" }
+                        th { "Latency" }
                         th { "Traffic" }
                         th { "Tables" }
                         th { "Last incoming" }

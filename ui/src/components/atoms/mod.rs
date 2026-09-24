@@ -4,6 +4,9 @@ pub use badge::*;
 mod state_pill;
 pub use state_pill::*;
 
+mod latency_pill;
+pub use latency_pill::*;
+
 mod sparkline;
 pub use sparkline::*;
 

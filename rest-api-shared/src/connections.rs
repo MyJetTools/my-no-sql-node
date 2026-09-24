@@ -29,6 +29,8 @@ pub struct ConnectionReaderContract {
     pub pending_to_send: u64,
     #[serde(rename = "lastIncomingTime")]
     pub last_incoming_time: String,
+    // Round trip in microseconds, as the reader reported it. Null until it does.
+    pub latency: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, MyHttpObjectStructure, Clone, Debug, PartialEq)]

@@ -18,6 +18,8 @@ pub struct DataReaderMetrics {
     /// Tables the reader subscribed to which have not arrived from the main node yet.
     pub awaiting_tables: Vec<String>,
     pub pending_to_send: usize,
+    /// Round trip in microseconds, as the reader reported it. `None` until it does.
+    pub latency: Option<i64>,
 }
 
 pub struct DataReader {
@@ -128,6 +130,23 @@ impl DataReader {
             tables,
             awaiting_tables,
             pending_to_send: self.get_pending_to_send(),
+            latency: self.get_latency(),
+        }
+    }
+
+    /// Kept for a TCP reader only - an HTTP reader does not ping.
+    pub fn set_latency(&self, micros: u64) {
+        match &self.connection {
+            DataReaderConnection::Tcp(connection) => connection.set_latency(micros),
+            DataReaderConnection::Http(_) => {}
+        }
+    }
+
+    /// `None` for an HTTP reader, and for a TCP one until it reports its first round trip.
+    pub fn get_latency(&self) -> Option<i64> {
+        match &self.connection {
+            DataReaderConnection::Tcp(connection) => connection.get_latency(),
+            DataReaderConnection::Http(_) => None,
         }
     }
 

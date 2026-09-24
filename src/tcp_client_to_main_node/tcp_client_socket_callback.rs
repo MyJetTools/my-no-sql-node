@@ -136,6 +136,7 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()>
             // The main node never sends these to a node. A CompressedPayload never reaches here
             // either - the serializer inflates it into the packet it carries.
             MyNoSqlTcpContract::Ping
+            | MyNoSqlTcpContract::PingWithLatency { .. }
             | MyNoSqlTcpContract::Greeting { .. }
             | MyNoSqlTcpContract::Subscribe { .. }
             | MyNoSqlTcpContract::GreetingFromNode { .. }

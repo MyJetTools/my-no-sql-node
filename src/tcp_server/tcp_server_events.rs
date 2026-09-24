@@ -97,6 +97,16 @@ impl SocketEventCallback<MyNoSqlTcpContract, MyNoSqlReaderTcpSerializer, ()> for
             MyNoSqlTcpContract::Ping => {
                 connection.send(&MyNoSqlTcpContract::Pong);
             }
+            MyNoSqlTcpContract::PingWithLatency { micros } => {
+                // A ping first: without the Pong the reader drops the connection as dead. Answered
+                // before the lookup below - the reader times the next round trip from this very
+                // Pong, and anything done ahead of it would read as latency.
+                connection.send(&MyNoSqlTcpContract::Pong);
+
+                if let Some(data_reader) = self.app.data_readers.get_tcp(connection.as_ref()) {
+                    data_reader.set_latency(micros);
+                }
+            }
             MyNoSqlTcpContract::Greeting { name } => {
                 if let Some(data_reader) = self.app.data_readers.get_tcp(connection.as_ref()) {
                     data_reader.set_name(name);

@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicI64, AtomicUsize, Ordering},
     Arc,
 };
 
@@ -11,11 +11,17 @@ use crate::tcp_server::MyNoSqlTcpConnection;
 
 use super::SendPerSecond;
 
+/// Kept in `latency_micros` until the reader reports its first round trip.
+const LATENCY_NOT_MEASURED: i64 = -1;
+
 pub struct TcpConnectionInfo {
     pub connection: Arc<MyNoSqlTcpConnection>,
     name: Mutex<Option<String>>,
     sent_per_second_accumulator: AtomicUsize,
     pub sent_per_second: SendPerSecond,
+    /// Round trip of the connection in microseconds. Only the reader can measure it - it is the
+    /// side which pings - so this is the number its last `PingWithLatency` carried.
+    latency_micros: AtomicI64,
 }
 
 impl TcpConnectionInfo {
@@ -25,7 +31,25 @@ impl TcpConnectionInfo {
             name: Mutex::new(None),
             sent_per_second_accumulator: AtomicUsize::new(0),
             sent_per_second: SendPerSecond::new(),
+            latency_micros: AtomicI64::new(LATENCY_NOT_MEASURED),
         }
+    }
+
+    pub fn set_latency(&self, micros: u64) {
+        let micros = i64::try_from(micros).unwrap_or(i64::MAX);
+        self.latency_micros.store(micros, Ordering::Relaxed);
+    }
+
+    /// `None` until the reader reports a round trip - and for good, when its SDK predates
+    /// `PingWithLatency` and it pings with a plain `Ping`.
+    pub fn get_latency(&self) -> Option<i64> {
+        let micros = self.latency_micros.load(Ordering::Relaxed);
+
+        if micros < 0 {
+            return None;
+        }
+
+        Some(micros)
     }
 
     pub fn get_ip(&self) -> String {
